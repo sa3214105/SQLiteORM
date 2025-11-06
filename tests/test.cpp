@@ -301,6 +301,30 @@ TEST_F(SQLiteHelperTest, ComplexOperations) {
     EXPECT_EQ(results3.size(), 2);
 }
 
+// ============ Transaction 測試 ============
+TEST_F(SQLiteHelperTest, TransactionCommit) {
+    SQLiteHelper::Database<UserTable> db("test_database.db");
+    {
+        auto tx = db.CreateTransaction();
+        tx.GetTable<UserTable>().Insert(NameColumn{.value = "TxUser"}, AgeColumn{.value = 99});
+        tx.Commit();
+    }
+    auto results = db.GetTable<UserTable>().Select<NameColumn, AgeColumn>().Where(SQLiteHelper::Equal<NameColumn>("TxUser")).Results();
+    EXPECT_EQ(results.size(), 1);
+    EXPECT_EQ(std::get<AgeColumn>(results[0]).value, 99);
+}
+
+TEST_F(SQLiteHelperTest, TransactionRollback) {
+    SQLiteHelper::Database<UserTable> db("test_database.db");
+    {
+        auto tx = db.CreateTransaction();
+        tx.GetTable<UserTable>().Insert(NameColumn{.value = "TxRollback"}, AgeColumn{.value = 88});
+        tx.Rollback();
+    }
+    auto results = db.GetTable<UserTable>().Select<NameColumn, AgeColumn>().Where(SQLiteHelper::Equal<NameColumn>("TxRollback")).Results();
+    EXPECT_EQ(results.size(), 0);
+}
+
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

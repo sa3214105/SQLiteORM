@@ -470,21 +470,25 @@ namespace SQLiteHelper {
     class Database : public Database_Base {
     public:
         class Transaction {
+            friend class Database;
         private:
             Database &_db;
+            bool _isCommittedOrRolledBack = false;
 
             Transaction(Database &db) : _db(db) {
                 char *errMsg = nullptr;
                 int rc = sqlite3_exec(_db._dbPtr.get(), "BEGIN TRANSACTION;", nullptr, nullptr, &errMsg);
                 if (rc != SQLITE_OK) {
                     std::string msg = errMsg ? errMsg : "Unknown error";
-                    sqlite3_free(errMsg);
                     throw std::runtime_error("Failed to begin transaction: " + msg);
                 }
             }
 
         public:
             ~Transaction() {
+                if (_isCommittedOrRolledBack) {
+                    return;
+                }
                 if (sqlite3_errcode(_db._dbPtr.get()) != SQLITE_OK) {
                     Rollback();
                 }
@@ -492,6 +496,7 @@ namespace SQLiteHelper {
             }
 
             void Rollback() {
+                _isCommittedOrRolledBack = true;
                 char *errMsg = nullptr;
                 if (sqlite3_exec(_db._dbPtr.get(), "ROLLBACK;", nullptr, nullptr, &errMsg)!= SQLITE_OK) {
                     std::string msg = errMsg ? errMsg : "Unknown error";
@@ -500,6 +505,7 @@ namespace SQLiteHelper {
             }
 
             void Commit() {
+                _isCommittedOrRolledBack = true;
                 char *errMsg = nullptr;
                 if (sqlite3_exec(_db._dbPtr.get(), "COMMIT;", nullptr, nullptr, &errMsg)!= SQLITE_OK) {
                     std::string msg = errMsg ? errMsg : "Unknown error";
@@ -533,6 +539,10 @@ namespace SQLiteHelper {
         template<typename T>
         T &GetTable() {
             return std::get<T>(_tables);
+        }
+
+        Transaction CreateTransaction() {
+            return Transaction(*this);
         }
     };
 }
