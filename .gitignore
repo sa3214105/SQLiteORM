@@ -1,0 +1,61 @@
+# C++/CMake build output
+cmake-build-*/
+build/
+CMakeFiles/
+Makefile
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+*.o
+*.obj
+*.so
+*.dll
+*.exe
+*.a
+*.lib
+*.bin
+*.out
+*.log
+*.tmp
+
+# CLion/IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# Coverage files
+*.gcda
+*.gcno
+*.gcov
+*.info
+coverage_report/
+coverage.info*
+
+# Test/SQLite DB
+*.db
+*.sqlite
+*.sqlite3
+
+# External dependencies (build output)
+external/googletest/build/
+external/googletest/*.o
+external/googletest/*.a
+external/googletest/*.so
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Python/Node/npm cache (if any)
+__pycache__/
+npm-debug.log
+node_modules/
+
+# Misc
+*.swp
+*.swo
+*.bak
+*.old
+
