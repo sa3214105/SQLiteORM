@@ -457,8 +457,9 @@ namespace SQLiteHelper {
 
     template<FixedString from>
     class QueryAble {
-    protected:
+    public:
         constexpr static FixedString name = from;
+    protected:
 
         Database_Base &db;
 

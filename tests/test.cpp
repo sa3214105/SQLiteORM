@@ -31,9 +31,25 @@ struct DeptColumn {
     std::string value;
 };
 
+struct CityColumn {
+    constexpr static SQLiteHelper::FixedString name = "city";
+    constexpr static SQLiteHelper::column_type type = SQLiteHelper::column_type::TEXT;
+    inline static SQLiteHelper::column_constraint constraint = {};
+    std::string value;
+};
+
+struct CountryColumn {
+    constexpr static SQLiteHelper::FixedString name = "country";
+    constexpr static SQLiteHelper::column_type type = SQLiteHelper::column_type::TEXT;
+    inline static SQLiteHelper::column_constraint constraint = {};
+    std::string value;
+};
+
 // 定義表類型
 using UserTable = SQLiteHelper::Table<"users", NameColumn, AgeColumn, ScoreColumn>;
 using DeptTable = SQLiteHelper::Table<"departments", DeptColumn, NameColumn>;
+using CityTable = SQLiteHelper::Table<"cities", NameColumn, CityColumn>;
+using CountryTable = SQLiteHelper::Table<"countries", CityColumn, CountryColumn>;
 
 class SQLiteHelperTest : public ::testing::Test {
 protected:
@@ -485,6 +501,136 @@ TEST_F(SQLiteHelperTest, FullJoinBasic) {
     EXPECT_TRUE(std::find(depts.begin(), depts.end(), "HR") != depts.end());
     EXPECT_TRUE(std::find(depts.begin(), depts.end(), "IT") != depts.end());
     EXPECT_EQ(results.size(), 4);
+}
+
+// ============ 多重 Join 測試 ============
+TEST_F(SQLiteHelperTest, MultiJoin_Inner_Inner_ThreeTables) {
+    SQLiteHelper::Database<UserTable, CityTable, CountryTable> db("test_database.db");
+    db.GetTable<UserTable>().Delete().Execute();
+    db.GetTable<CityTable>().Delete().Execute();
+    db.GetTable<CountryTable>().Delete().Execute();
+
+    // users
+    db.GetTable<UserTable>().Insert(NameColumn{.value = "Alice"});
+    db.GetTable<UserTable>().Insert(NameColumn{.value = "Bob"});
+    db.GetTable<UserTable>().Insert(NameColumn{.value = "Eve"});
+
+    // cities
+    db.GetTable<CityTable>().Insert(NameColumn{.value = "Alice"}, CityColumn{.value = "Paris"});
+    db.GetTable<CityTable>().Insert(NameColumn{.value = "Bob"}, CityColumn{.value = "Tokyo"});
+    db.GetTable<CityTable>().Insert(NameColumn{.value = "Mallory"}, CityColumn{.value = "Berlin"});
+
+    // countries
+    db.GetTable<CountryTable>().Insert(CityColumn{.value = "Paris"}, CountryColumn{.value = "France"});
+    db.GetTable<CountryTable>().Insert(CityColumn{.value = "Tokyo"}, CountryColumn{.value = "Japan"});
+    db.GetTable<CountryTable>().Insert(CityColumn{.value = "Berlin"}, CountryColumn{.value = "Germany"});
+
+    using UName = UserTable::TableColumn<NameColumn>;
+    using CName = CityTable::TableColumn<NameColumn>;
+    using UCity = CityTable::TableColumn<CityColumn>;
+    using CCty = CountryTable::TableColumn<CityColumn>;
+    using UCountry = CountryTable::TableColumn<CountryColumn>;
+
+    auto results = db.GetTable<UserTable>()
+        .InnerJoin<CityTable, SQLiteHelper::EqualCond<UName, CName>>()
+        .InnerJoin<CountryTable, SQLiteHelper::EqualCond<UCity, CCty>>()
+        .Select<UName, UCity, UCountry>()
+        .Results();
+
+    ASSERT_EQ(results.size(), 2);
+    std::vector<std::string> countries;
+    for (auto &row : results) {
+        countries.push_back(std::get<UCountry>(row).value);
+    }
+    EXPECT_NE(std::find(countries.begin(), countries.end(), "France"), countries.end());
+    EXPECT_NE(std::find(countries.begin(), countries.end(), "Japan"), countries.end());
+}
+
+TEST_F(SQLiteHelperTest, MultiJoin_Left_Left_ThreeTables) {
+    SQLiteHelper::Database<UserTable, CityTable, CountryTable> db("test_database.db");
+    db.GetTable<UserTable>().Delete().Execute();
+    db.GetTable<CityTable>().Delete().Execute();
+    db.GetTable<CountryTable>().Delete().Execute();
+
+    // users
+    db.GetTable<UserTable>().Insert(NameColumn{.value = "Alice"});
+    db.GetTable<UserTable>().Insert(NameColumn{.value = "Bob"});
+    db.GetTable<UserTable>().Insert(NameColumn{.value = "Charlie"});
+
+    // cities (Charlie has no city)
+    db.GetTable<CityTable>().Insert(NameColumn{.value = "Alice"}, CityColumn{.value = "Paris"});
+    db.GetTable<CityTable>().Insert(NameColumn{.value = "Bob"}, CityColumn{.value = "Tokyo"});
+
+    // countries (Tokyo has no country)
+    db.GetTable<CountryTable>().Insert(CityColumn{.value = "Paris"}, CountryColumn{.value = "France"});
+
+    using UName = UserTable::TableColumn<NameColumn>;
+    using CName = CityTable::TableColumn<NameColumn>;
+    using UCity = CityTable::TableColumn<CityColumn>;
+    using CCty = CountryTable::TableColumn<CityColumn>;
+    using UCountry = CountryTable::TableColumn<CountryColumn>;
+
+    auto results = db.GetTable<UserTable>()
+        .LeftJoin<CityTable, SQLiteHelper::EqualCond<UName, CName>>()
+        .LeftJoin<CountryTable, SQLiteHelper::EqualCond<UCity, CCty>>()
+        .Select<UName, UCity, UCountry>()
+        .Results();
+
+    ASSERT_EQ(results.size(), 3);
+    // Ensure Charlie exists with empty city/country
+    bool hasCharlie = false; bool hasEmptyForCharlie = false;
+    for (auto &row : results) {
+        if (std::get<UName>(row).value == "Charlie") {
+            hasCharlie = true;
+            hasEmptyForCharlie = std::get<UCity>(row).value.empty() && std::get<UCountry>(row).value.empty();
+        }
+    }
+    EXPECT_TRUE(hasCharlie);
+    EXPECT_TRUE(hasEmptyForCharlie);
+}
+
+TEST_F(SQLiteHelperTest, MultiJoin_Inner_Then_Left) {
+    SQLiteHelper::Database<UserTable, DeptTable, CityTable> db("test_database.db");
+    db.GetTable<UserTable>().Delete().Execute();
+    db.GetTable<DeptTable>().Delete().Execute();
+    db.GetTable<CityTable>().Delete().Execute();
+
+    // users
+    db.GetTable<UserTable>().Insert(NameColumn{.value = "Alice"});
+    db.GetTable<UserTable>().Insert(NameColumn{.value = "Bob"});
+    db.GetTable<UserTable>().Insert(NameColumn{.value = "Eve"});
+
+    // departments (only Alice and Bob)
+    db.GetTable<DeptTable>().Insert(DeptColumn{.value = "HR"}, NameColumn{.value = "Alice"});
+    db.GetTable<DeptTable>().Insert(DeptColumn{.value = "IT"}, NameColumn{.value = "Bob"});
+
+    // cities (only Alice)
+    db.GetTable<CityTable>().Insert(NameColumn{.value = "Alice"}, CityColumn{.value = "Paris"});
+
+    using UName = UserTable::TableColumn<NameColumn>;
+    using DName = DeptTable::TableColumn<NameColumn>;
+    using Dept = DeptTable::TableColumn<DeptColumn>;
+    using CName = CityTable::TableColumn<NameColumn>;
+    using City = CityTable::TableColumn<CityColumn>;
+
+    auto results = db.GetTable<UserTable>()
+        .InnerJoin<DeptTable, SQLiteHelper::EqualCond<UName, DName>>()
+        .LeftJoin<CityTable, SQLiteHelper::EqualCond<UName, CName>>()
+        .Select<UName, Dept, City>()
+        .Results();
+
+    // Only Alice and Bob (inner with Dept), with city only for Alice
+    ASSERT_EQ(results.size(), 2);
+    for (auto &row : results) {
+        if (std::get<UName>(row).value == "Alice") {
+            EXPECT_EQ(std::get<Dept>(row).value, std::string("HR"));
+            EXPECT_EQ(std::get<City>(row).value, std::string("Paris"));
+        }
+        if (std::get<UName>(row).value == "Bob") {
+            EXPECT_EQ(std::get<Dept>(row).value, std::string("IT"));
+            EXPECT_TRUE(std::get<City>(row).value.empty());
+        }
+    }
 }
 
 int main(int argc, char **argv) {
