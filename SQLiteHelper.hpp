@@ -29,6 +29,53 @@ namespace SQLiteHelper {
         }
     };
 
+    template<int num>
+    constexpr auto toFixedString() {
+        if constexpr (num < 0) {
+            char arr[2] = {'0' + (num * -1 % 10), '\0'};
+            if constexpr (num <= -10) {
+                return "-" + toFixedString<num / 10 * -1>() + FixedString(arr);
+            } else {
+                return "-" + FixedString(arr);
+            }
+        } else {
+            char arr[2] = {'0' + (num % 10), '\0'};
+            if constexpr (num >= 10) {
+                return toFixedString<num / 10>() + FixedString(arr);
+            } else {
+                return FixedString(arr);
+            }
+        }
+    }
+
+    template<double Fraction>
+    constexpr auto FractionToFixedString() {
+        // 如果剩餘的小數部分非常小，就停止遞迴
+        if constexpr (Fraction < std::numeric_limits<double>::epsilon()) {
+            return FixedString("");
+        } else {
+            constexpr double scaled = Fraction * 10; // 取出下一位小數
+            return toFixedString<(int) scaled>() // 加上整數部分
+                   + FractionToFixedString<scaled - (int) scaled>(); // 繼續處理剩餘小數
+        }
+    }
+
+    template<double Number>
+    constexpr auto toFixedString() {
+        constexpr int IntegerPart = Number; // 整數部分
+        constexpr double FractionPart = Number - IntegerPart; // 小數部分
+
+        if constexpr (FractionPart < std::numeric_limits<double>::epsilon()) {
+            // 沒有小數部分 → 僅輸出整數
+            return toFixedString<IntegerPart>();
+        } else {
+            // 有小數 → 整數 + "." + 小數遞迴轉換
+            return toFixedString<IntegerPart>()
+                   + "."
+                   + FractionToFixedString<FractionPart>();
+        }
+    }
+
     template<typename T>
     struct IsFixedString : std::false_type {
     };
@@ -126,9 +173,7 @@ namespace SQLiteHelper {
 
     template<typename T1, typename T2, FixedString Opt>
     struct TwoValueCond {
-        inline const static std::string condition =
-                std::string(" ") + std::string(GetColumnName<T1>()) + std::string(Opt) + std::string(
-                    GetColumnName<T2>());
+        constexpr static FixedString condition = " " + GetColumnName<T1>() + Opt + GetColumnName<T2>();
     };
 
     template<typename T1, typename T2>
@@ -149,16 +194,13 @@ namespace SQLiteHelper {
 
     template<typename T1, FixedType V2, FixedString Opt> requires IsFixedString<typename decltype(V2)::SaveType>::value
     struct OneValueCond<T1, V2, Opt> {
-        inline const static std::string condition =
-                std::string(" ") + std::string(GetColumnName<T1>()) + std::string(Opt) + "'" + std::string(V2.value) +
-                "'";
+        constexpr static FixedString condition = " " + GetColumnName<T1>() + Opt + "'" + V2.value + "'";
     };
 
     template<typename T1, FixedType V2, FixedString Opt> requires (!IsFixedString<typename decltype(V2
     )::SaveType>::value)
     struct OneValueCond<T1, V2, Opt> {
-        inline const static std::string condition =
-                std::string(" ") + std::string(GetColumnName<T1>()) + std::string(Opt) + std::to_string(V2.value);
+        constexpr static FixedString condition = " " + GetColumnName<T1>() + Opt + toFixedString<V2.value>();
     };
 
     template<typename T1, FixedType T2>
@@ -176,14 +218,12 @@ namespace SQLiteHelper {
 
     template<typename Cond1, typename Cond2>
     struct AndCond {
-        inline const static std::string condition =
-                std::string("(") + Cond1::condition + ") AND (" + Cond2::condition + ")";
+        constexpr static FixedString condition = "(" + Cond1::condition + ") AND (" + Cond2::condition + ")";
     };
 
     template<typename Cond1, typename Cond2>
     struct OrCond {
-        inline const static std::string condition =
-                std::string("(") + Cond1::condition + ") OR (" + Cond2::condition + ")";
+        constexpr static FixedString condition = "(" + Cond1::condition + ") OR (" + Cond2::condition + ")";
     };
 
     template<typename T, typename... Ts>
@@ -404,16 +444,28 @@ namespace SQLiteHelper {
         virtual ~Database_Base() = default;
     };
 
+    template<typename Table1, typename Table2, typename Condition>
+    class FullJoinTable;
+    template<typename Table1, typename Table2, typename Condition>
+    class InnerJoinTable;
+    template<typename Table1, typename Table2, typename Condition>
+    class LeftJoinTable;
+    template<typename Table1, typename Table2, typename Condition>
+    class RightJoinTable;
+    template<typename Table1, typename Table2, typename Condition>
+    class CrossJoinTable;
+
+    template<FixedString from>
     class QueryAble {
     protected:
-        std::string from_sql;
+        constexpr static FixedString name = from;
+
         Database_Base &db;
 
         template<typename... ResultColumns>
         class SelectQuery {
             QueryAble &_query_able;
             std::string _basic_sql;
-            const std::string _from_sql;
             std::string _where_sql;
 
             template<typename T, typename... Ts>
@@ -435,8 +487,7 @@ namespace SQLiteHelper {
             }
 
         public:
-            explicit SelectQuery(QueryAble &query_able) : _query_able(query_able),
-                                                          _from_sql(" FROM " + query_able.from_sql) {
+            explicit SelectQuery(QueryAble &query_able) : _query_able(query_able) {
                 _basic_sql = "SELECT " + GetColumnNames<ResultColumns...>();
             }
 
@@ -448,7 +499,7 @@ namespace SQLiteHelper {
 
             auto Results() {
                 sqlite3_stmt *stmt = nullptr;
-                auto sql = _basic_sql + _from_sql + _where_sql + ";";
+                auto sql = _basic_sql + " FROM " + std::string(from) + _where_sql + ";";
                 if (sqlite3_prepare_v2(_query_able.db._dbPtr.get(), sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
                     throw std::runtime_error(
                         std::string("Failed to prepare statement") + sqlite3_errmsg(_query_able.db._dbPtr.get()));
@@ -465,7 +516,7 @@ namespace SQLiteHelper {
         };
 
     public:
-        explicit QueryAble(Database_Base &db, const std::string_view &from_sql) : db(db), from_sql(from_sql) {
+        explicit QueryAble(Database_Base &db) : db(db) {
         }
 
         virtual ~QueryAble() = default;
@@ -474,58 +525,98 @@ namespace SQLiteHelper {
         auto Select() {
             return SelectQuery<ResultCol...>(*this);
         }
-    };
 
-    template<typename Table1, typename Table2, typename Condition>
-    class FullJoinTable : public QueryAble {
-    public:
-        FullJoinTable(Database_Base &db) : QueryAble(
-            db, std::string(Table1::name) + std::string(" FULL JOIN ") + std::string(Table2::name) + std::string(" ON ")
-                + Condition::condition) {
+        template<typename Table2, typename Condition>
+        auto FullJoin() {
+            return FullJoinTable<QueryAble, Table2, Condition>(this->db);
+        }
+
+        template<typename Table2, typename Condition>
+        auto InnerJoin() {
+            return InnerJoinTable<QueryAble, Table2, Condition>(this->db);
+        }
+
+        template<typename Table2, typename Condition>
+        auto LeftJoin() {
+            return LeftJoinTable<QueryAble, Table2, Condition>(this->db);
+        }
+
+        template<typename Table2, typename Condition>
+        auto RightJoin() {
+            return RightJoinTable<QueryAble, Table2, Condition>(this->db);
+        }
+
+        template<typename Table2, typename Condition>
+        auto CrossJoin() {
+            return CrossJoinTable<QueryAble, Table2, Condition>(this->db);
         }
     };
 
     template<typename Table1, typename Table2, typename Condition>
-    class InnerJoinTable : public QueryAble {
+    class FullJoinTable : public QueryAble<Table1::name + FixedString(" FULL JOIN ") + Table2::name +
+                                           FixedString(" ON ") + Condition::condition> {
     public:
-        InnerJoinTable(Database_Base &db) : QueryAble(
-            db, std::string(Table1::name) + std::string(" INNER JOIN ") + std::string(Table2::name) +
-                std::string(" ON ") +
-                std::string(Condition::condition)) {
-        }
+        constexpr static FixedString name = Table1::name + FixedString(" FULL JOIN ") + Table2::name +
+                                            FixedString(" ON ") + Condition::condition;
+
+        explicit FullJoinTable(Database_Base &db) : QueryAble<Table1::name + FixedString(" FULL JOIN ") + Table2::name +
+                                                              FixedString(" ON ") + Condition::condition>(db) {
+        };
     };
 
     template<typename Table1, typename Table2, typename Condition>
-    class LeftJoinTable : public QueryAble {
+    class InnerJoinTable : public QueryAble<Table1::name + FixedString(" INNER JOIN ") + Table2::name +
+                                            FixedString(" ON ") + Condition::condition> {
     public:
-        LeftJoinTable(Database_Base &db) : QueryAble(
-            db, std::string(Table1::name) + std::string(" LEFT JOIN ") + std::string(Table2::name) + std::string(" ON ")
-                + std::string(Condition::condition)) {
-        }
+        constexpr static FixedString name = Table1::name + FixedString(" INNER JOIN ") + Table2::name +
+                                            FixedString(" ON ") + Condition::condition;
+
+        explicit InnerJoinTable(Database_Base &db) : QueryAble<
+            Table1::name + FixedString(" INNER JOIN ") + Table2::name +
+            FixedString(" ON ") + Condition::condition>(db) {
+        };
     };
 
     template<typename Table1, typename Table2, typename Condition>
-    class RightJoinTable : public QueryAble {
+    class LeftJoinTable : public QueryAble<Table1::name + FixedString(" LEFT JOIN ") + Table2::name +
+                                           FixedString(" ON ") + Condition::condition> {
     public:
-        RightJoinTable(Database_Base &db) : QueryAble(
-            db, std::string(Table1::name) + std::string(" RIGHT JOIN ") + std::string(Table2::name) +
-                std::string(" ON ") +
-                std::string(Condition::condition)) {
-        }
+        constexpr static FixedString name = Table1::name + FixedString(" LEFT JOIN ") + Table2::name +
+                                            FixedString(" ON ") + Condition::condition;
+
+        explicit LeftJoinTable(Database_Base &db) : QueryAble<Table1::name + FixedString(" LEFT JOIN ") + Table2::name +
+                                                              FixedString(" ON ") + Condition::condition>(db) {
+        };
     };
 
     template<typename Table1, typename Table2, typename Condition>
-    class CrossJoinTable : public QueryAble {
+    class RightJoinTable : public QueryAble<Table1::name + FixedString(" RIGHT JOIN ") + Table2::name +
+                                            FixedString(" ON ") + Condition::condition> {
     public:
-        CrossJoinTable(Database_Base &db) : QueryAble(
-            db, std::string(Table1::name) + std::string(" CROSS JOIN ") + std::string(Table2::name) +
-                std::string(" ON ") +
-                std::string(Condition::condition)) {
-        }
+        constexpr static FixedString name = Table1::name + FixedString(" RIGHT JOIN ") + Table2::name +
+                                            FixedString(" ON ") + Condition::condition;
+
+        explicit RightJoinTable(Database_Base &db) : QueryAble<
+            Table1::name + FixedString(" RIGHT JOIN ") + Table2::name +
+            FixedString(" ON ") + Condition::condition>(db) {
+        };
+    };
+
+    template<typename Table1, typename Table2, typename Condition>
+    class CrossJoinTable : public QueryAble<Table1::name + FixedString(" CROSS JOIN ") + Table2::name +
+                                            FixedString(" ON ") + Condition::condition> {
+    public:
+        constexpr static FixedString name = Table1::name + FixedString(" CROSS JOIN ") + Table2::name +
+                                            FixedString(" ON ") + Condition::condition;
+
+        explicit CrossJoinTable(Database_Base &db) : QueryAble<
+            Table1::name + FixedString(" CROSS JOIN ") + Table2::name +
+            FixedString(" ON ") + Condition::condition>(db) {
+        };
     };
 
     template<FixedString TableName, typename... Columns>
-    class Table : public QueryAble {
+    class Table : public QueryAble<TableName> {
     public:
         constexpr static FixedString name = TableName;
         using columns = typeGroup<Columns...>;
@@ -609,7 +700,7 @@ namespace SQLiteHelper {
         };
 
     public:
-        explicit Table(Database_Base &db) : QueryAble(db, name), db(db) {
+        explicit Table(Database_Base &db) : QueryAble<name>(db), db(db) {
             std::string sql = std::string("CREATE TABLE IF NOT EXISTS ") + std::string(name) + " (";
             sql += GetColumnDefinitions<Columns...>();
             sql += ");";
@@ -651,7 +742,7 @@ namespace SQLiteHelper {
         template<typename... ResultCol>
         auto Select() {
             static_assert(isTypeGroupSubset<typeGroup<ResultCol...>, columns>);
-            return QueryAble::Select<ResultCol...>();
+            return QueryAble<name>::template Select<ResultCol...>();
         }
 
         template<typename... U>
