@@ -24,11 +24,31 @@ namespace SQLiteHelper {
             return {value, N - 1};
         }
 
-        operator const char *() const {
-            return value;
+        operator std::string() const {
+            return std::string{value, N - 1};
+        }
+    };
+
+    template<typename T>
+    struct IsFixedString : std::false_type {
+    };
+
+    template<size_t N>
+    struct IsFixedString<FixedString<N> > : std::true_type {
+    };
+
+    template<typename T, size_t N = 0>
+    struct FixedType {
+        using SaveType = std::conditional_t<std::is_same_v<char, T> && N != 0, FixedString<N>, T>;
+        SaveType value;
+
+        constexpr FixedType(T u) : value(u) {
         }
 
-        operator const std::string() const {
+        constexpr FixedType(const T (&str)[N]) : value(str) {
+        }
+
+        constexpr operator SaveType &() const {
             return value;
         }
     };
@@ -76,7 +96,7 @@ namespace SQLiteHelper {
     concept ColumnConcept = requires()
     {
         { T::type } -> std::convertible_to<column_type>;
-        { T::name } -> std::convertible_to<std::string>;
+        { T::name } -> std::convertible_to<std::string_view>;
         { T::constraint } -> std::convertible_to<column_constraint>;
     };
 
@@ -95,7 +115,7 @@ namespace SQLiteHelper {
     constexpr auto GetColumnName() {
         if constexpr (IsTableColumn<T>) {
             return T::TableType::name + FixedString(".") + T::name;
-        }else {
+        } else {
             return T::name;
         }
     }
@@ -104,84 +124,67 @@ namespace SQLiteHelper {
         constexpr static FixedString condition = " 1 ";
     };
 
-    template<typename T1, typename T2>
-    struct EqualCond {
-        constexpr static FixedString condition = FixedString(" ") + GetColumnName<T1>() + " = " + GetColumnName<T2>();
+    template<typename T1, typename T2, FixedString Opt>
+    struct TwoValueCond {
+        inline const static std::string condition =
+                std::string(" ") + std::string(GetColumnName<T1>()) + std::string(Opt) + std::string(
+                    GetColumnName<T2>());
     };
 
-    struct Condition {
-        std::string condition;
+    template<typename T1, typename T2>
+    using EqualCond = TwoValueCond<T1, T2, FixedString(" = ")>;
+    template<typename T1, typename T2>
+    using NotEqualCond = TwoValueCond<T1, T2, FixedString(" != ")>;
+    template<typename T1, typename T2>
+    using GreaterThanCond = TwoValueCond<T1, T2, FixedString(" > ")>;
+    template<typename T1, typename T2>
+    using GreaterThanEqualCond = TwoValueCond<T1, T2, FixedString(" >= ")>;
+    template<typename T1, typename T2>
+    using LessThanCond = TwoValueCond<T1, T2, FixedString(" < ")>;
+    template<typename T1, typename T2>
+    using LessThanEqualCond = TwoValueCond<T1, T2, FixedString(" <= ")>;
 
-        Condition &operator&&(const Condition &other) {
-            condition = "(" + condition + ") AND (" + other.condition + ")";
-            return *this;
-        }
+    template<typename T1, FixedType V2, FixedString Opt>
+    struct OneValueCond;
 
-        Condition &operator||(const Condition &other) {
-            condition = "(" + condition + ") OR (" + other.condition + ")";
-            return *this;
-        }
+    template<typename T1, FixedType V2, FixedString Opt> requires IsFixedString<typename decltype(V2)::SaveType>::value
+    struct OneValueCond<T1, V2, Opt> {
+        inline const static std::string condition =
+                std::string(" ") + std::string(GetColumnName<T1>()) + std::string(Opt) + "'" + std::string(V2.value) +
+                "'";
     };
 
-    template<typename T>
-    Condition Equal(const std::string &value) {
-        return {.condition = std::string(" ") + std::string(T::name) + " = '" + value + "'"};
-    }
+    template<typename T1, FixedType V2, FixedString Opt> requires (!IsFixedString<typename decltype(V2
+    )::SaveType>::value)
+    struct OneValueCond<T1, V2, Opt> {
+        inline const static std::string condition =
+                std::string(" ") + std::string(GetColumnName<T1>()) + std::string(Opt) + std::to_string(V2.value);
+    };
 
-    template<typename T1, typename T2>
-    Condition Equal() {
-        return {.condition = std::string(" ") + std::string(T1::name) + " = " + T2::name};
-    }
+    template<typename T1, FixedType T2>
+    using EqualValueCond = OneValueCond<T1, T2, FixedString(" = ")>;
+    template<typename T1, FixedType T2>
+    using NotEqualValueCond = OneValueCond<T1, T2, FixedString(" != ")>;
+    template<typename T, FixedType V2> /*requires std::is_integral_v<typename decltype(V2)::SaveType>*/
+    using GreaterThanValueCond = OneValueCond<T, V2, FixedString(" > ")>;
+    template<typename T, FixedType V2> /*requires std::is_integral_v<typename decltype(V2)::SaveType>*/
+    using GreaterThanEqualValueCond = OneValueCond<T, V2, FixedString(" >= ")>;
+    template<typename T, FixedType V2> /*requires std::is_integral_v<typename decltype(V2)::SaveType>*/
+    using LessThanValueCond = OneValueCond<T, V2, FixedString(" < ")>;
+    template<typename T, FixedType V2> /*requires std::is_integral_v<typename decltype(V2)::SaveType>*/
+    using LessThanEqualValueCond = OneValueCond<T, V2, FixedString(" <= ")>;
 
-    template<typename T>
-    Condition NotEqual(const std::string &value) {
-        return {.condition = std::string(" ") + std::string(T::name) + " != '" + value + "'"};
-    }
+    template<typename Cond1, typename Cond2>
+    struct AndCond {
+        inline const static std::string condition =
+                std::string("(") + Cond1::condition + ") AND (" + Cond2::condition + ")";
+    };
 
-    template<typename T1, typename T2>
-    Condition NotEqual() {
-        return {.condition = std::string(" ") + std::string(T1::name) + " != " + T2::name};
-    }
-
-    template<typename T>
-    Condition GreaterThan(const std::string &value) {
-        return {.condition = std::string(" ") + std::string(T::name) + " > '" + value + "'"};
-    }
-
-    template<typename T1, typename T2>
-    Condition GreaterThan() {
-        return {.condition = std::string(" ") + std::string(T1::name) + " > " + T2::name};
-    }
-
-    template<typename T>
-    Condition LessThan(const std::string &value) {
-        return {.condition = std::string(" ") + std::string(T::name) + " < '" + value + "'"};
-    }
-
-    template<typename T1, typename T2>
-    Condition LessThan() {
-        return {.condition = std::string(" ") + std::string(T1::name) + " < " + T2::name};
-    }
-
-    template<typename T>
-    Condition GreaterThanEqual(const std::string &value) {
-        return {.condition = std::string(" ") + std::string(T::name) + " >= '" + value + "'"};
-    }
-
-    template<typename T1, typename T2>
-    Condition GreaterThanEqual() {
-        return {.condition = std::string(" ") + std::string(T1::name) + " >= " + T2::name};
-    }
-
-    template<typename T>
-    Condition LessThanEqual(const std::string &value) {
-        return {.condition = std::string(" ") + std::string(T::name) + " <= '" + value + "'"};
-    }
-
-    template<typename T1, typename T2>
-    Condition LessThanEqual() {
-        return {.condition = std::string(" ") + std::string(T1::name) + " <= " + T2::name};
-    }
+    template<typename Cond1, typename Cond2>
+    struct OrCond {
+        inline const static std::string condition =
+                std::string("(") + Cond1::condition + ") OR (" + Cond2::condition + ")";
+    };
 
     template<typename T, typename... Ts>
     struct typeGroup {
@@ -226,7 +229,7 @@ namespace SQLiteHelper {
 
     template<ColumnConcept T>
     std::string DefineColumnSQL() {
-        std::string sql = T::name + " ";
+        std::string sql = std::string(T::name) + " ";
         switch (T::type) {
             case column_type::TEXT:
                 sql += "TEXT";
@@ -437,8 +440,9 @@ namespace SQLiteHelper {
                 _basic_sql = "SELECT " + GetColumnNames<ResultColumns...>();
             }
 
-            SelectQuery &Where(const Condition &condition) {
-                _where_sql = " WHERE " + condition.condition;
+            template<typename Condition>
+            SelectQuery &Where() {
+                _where_sql = " WHERE " + std::string(Condition::condition);
                 return *this;
             }
 
@@ -461,7 +465,7 @@ namespace SQLiteHelper {
         };
 
     public:
-        explicit QueryAble(Database_Base &db, const std::string &from_sql) : db(db), from_sql(from_sql) {
+        explicit QueryAble(Database_Base &db, const std::string_view &from_sql) : db(db), from_sql(from_sql) {
         }
 
         virtual ~QueryAble() = default;
@@ -476,7 +480,8 @@ namespace SQLiteHelper {
     class FullJoinTable : public QueryAble {
     public:
         FullJoinTable(Database_Base &db) : QueryAble(
-            db, Table1::name + FixedString(" FULL JOIN ") + Table2::name + FixedString(" ON ") + Condition::condition) {
+            db, std::string(Table1::name) + std::string(" FULL JOIN ") + std::string(Table2::name) + std::string(" ON ")
+                + Condition::condition) {
         }
     };
 
@@ -484,8 +489,9 @@ namespace SQLiteHelper {
     class InnerJoinTable : public QueryAble {
     public:
         InnerJoinTable(Database_Base &db) : QueryAble(
-            db, Table1::name + FixedString(" INNER JOIN ") + Table2::name + FixedString(" ON ") +
-                Condition::condition) {
+            db, std::string(Table1::name) + std::string(" INNER JOIN ") + std::string(Table2::name) +
+                std::string(" ON ") +
+                std::string(Condition::condition)) {
         }
     };
 
@@ -493,7 +499,8 @@ namespace SQLiteHelper {
     class LeftJoinTable : public QueryAble {
     public:
         LeftJoinTable(Database_Base &db) : QueryAble(
-            db, Table1::name + FixedString(" LEFT JOIN ") + Table2::name + FixedString(" ON ") + Condition::condition) {
+            db, std::string(Table1::name) + std::string(" LEFT JOIN ") + std::string(Table2::name) + std::string(" ON ")
+                + std::string(Condition::condition)) {
         }
     };
 
@@ -501,8 +508,9 @@ namespace SQLiteHelper {
     class RightJoinTable : public QueryAble {
     public:
         RightJoinTable(Database_Base &db) : QueryAble(
-            db, Table1::name + FixedString(" RIGHT JOIN ") + Table2::name + FixedString(" ON ") +
-                Condition::condition) {
+            db, std::string(Table1::name) + std::string(" RIGHT JOIN ") + std::string(Table2::name) +
+                std::string(" ON ") +
+                std::string(Condition::condition)) {
         }
     };
 
@@ -510,8 +518,9 @@ namespace SQLiteHelper {
     class CrossJoinTable : public QueryAble {
     public:
         CrossJoinTable(Database_Base &db) : QueryAble(
-            db, Table1::name + FixedString(" CROSS JOIN ") + Table2::name + FixedString(" ON ") +
-                Condition::condition) {
+            db, std::string(Table1::name) + std::string(" CROSS JOIN ") + std::string(Table2::name) +
+                std::string(" ON ") +
+                std::string(Condition::condition)) {
         }
     };
 
@@ -537,8 +546,9 @@ namespace SQLiteHelper {
                 _basic_sql = std::string("UPDATE ") + std::string(name) + " SET " + GetUpdateField<Ts...>();
             }
 
-            UpdateQuery &Where(const Condition &condition) {
-                _where_sql = std::string(" WHERE ") + condition.condition;
+            template<typename Condition>
+            UpdateQuery &Where() {
+                _where_sql = std::string(" WHERE ") + std::string(Condition::condition);
                 return *this;
             }
 
@@ -575,8 +585,9 @@ namespace SQLiteHelper {
                 _basic_sql = std::string("DELETE FROM ") + std::string(name);
             }
 
-            DeleteQuery &Where(const Condition &condition) {
-                _where_sql = std::string(" WHERE ") + condition.condition;
+            template<typename Condition>
+            DeleteQuery &Where() {
+                _where_sql = std::string(" WHERE ") + std::string(Condition::condition);
                 return *this;
             }
 

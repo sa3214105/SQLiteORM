@@ -107,7 +107,7 @@ TEST_F(SQLiteHelperTest, WhereEqual) {
     db.GetTable<UserTable>().Insert(NameColumn{.value = "Bob"});
 
     auto results = db.GetTable<UserTable>().Select<NameColumn>()
-            .Where(SQLiteHelper::Equal<NameColumn>("Alice")).Results();
+            .Where<SQLiteHelper::EqualValueCond<NameColumn, "Alice">>().Results();
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<NameColumn>(results[0]).value, "Alice");
 }
@@ -119,7 +119,7 @@ TEST_F(SQLiteHelperTest, WhereNotEqual) {
     db.GetTable<UserTable>().Insert(NameColumn{.value = "Charlie"});
 
     auto results = db.GetTable<UserTable>().Select<NameColumn>()
-            .Where(SQLiteHelper::NotEqual<NameColumn>("Alice")).Results();
+            .Where<SQLiteHelper::NotEqualValueCond<NameColumn, "Alice">>().Results();
     EXPECT_EQ(results.size(), 2);
 }
 
@@ -130,7 +130,7 @@ TEST_F(SQLiteHelperTest, WhereGreaterThan) {
     db.GetTable<UserTable>().Insert(AgeColumn{.value = 30});
 
     auto results = db.GetTable<UserTable>().Select<AgeColumn>()
-            .Where(SQLiteHelper::GreaterThan<AgeColumn>("25")).Results();
+            .Where<SQLiteHelper::GreaterThanValueCond<AgeColumn, 25>>().Results();
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<AgeColumn>(results[0]).value, 30);
 }
@@ -142,7 +142,7 @@ TEST_F(SQLiteHelperTest, WhereLessThan) {
     db.GetTable<UserTable>().Insert(AgeColumn{.value = 30});
 
     auto results = db.GetTable<UserTable>().Select<AgeColumn>()
-            .Where(SQLiteHelper::LessThan<AgeColumn>("25")).Results();
+            .Where<SQLiteHelper::LessThanValueCond<AgeColumn, "25">>().Results();
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<AgeColumn>(results[0]).value, 20);
 }
@@ -154,7 +154,7 @@ TEST_F(SQLiteHelperTest, WhereGreaterThanEqual) {
     db.GetTable<UserTable>().Insert(AgeColumn{.value = 30});
 
     auto results = db.GetTable<UserTable>().Select<AgeColumn>()
-            .Where(SQLiteHelper::GreaterThanEqual<AgeColumn>("25")).Results();
+            .Where<SQLiteHelper::GreaterThanEqualValueCond<AgeColumn, "25">>().Results();
     EXPECT_EQ(results.size(), 2);
 }
 
@@ -165,7 +165,7 @@ TEST_F(SQLiteHelperTest, WhereLessThanEqual) {
     db.GetTable<UserTable>().Insert(AgeColumn{.value = 30});
 
     auto results = db.GetTable<UserTable>().Select<AgeColumn>()
-            .Where(SQLiteHelper::LessThanEqual<AgeColumn>("25")).Results();
+            .Where<SQLiteHelper::LessThanEqualValueCond<AgeColumn, "25">>().Results();
     EXPECT_EQ(results.size(), 2);
 }
 
@@ -176,10 +176,12 @@ TEST_F(SQLiteHelperTest, WhereAND) {
     db.GetTable<UserTable>().Insert(NameColumn{.value = "Bob"}, AgeColumn{.value = 30});
     db.GetTable<UserTable>().Insert(NameColumn{.value = "Alice"}, AgeColumn{.value = 35});
 
-    auto cond = SQLiteHelper::Equal<NameColumn>("Alice") &&
-                SQLiteHelper::GreaterThan<AgeColumn>("25");
+    using Cond = SQLiteHelper::AndCond<
+        SQLiteHelper::EqualValueCond<NameColumn, "Alice">,
+        SQLiteHelper::GreaterThanValueCond<AgeColumn, "25">
+    >;
     auto results = db.GetTable<UserTable>().Select<NameColumn, AgeColumn>()
-            .Where(cond).Results();
+            .Where<Cond>().Results();
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<AgeColumn>(results[0]).value, 35);
 }
@@ -190,10 +192,12 @@ TEST_F(SQLiteHelperTest, WhereOR) {
     db.GetTable<UserTable>().Insert(NameColumn{.value = "Bob"}, AgeColumn{.value = 30});
     db.GetTable<UserTable>().Insert(NameColumn{.value = "Charlie"}, AgeColumn{.value = 35});
 
-    auto cond = SQLiteHelper::Equal<NameColumn>("Alice") ||
-                SQLiteHelper::Equal<NameColumn>("Bob");
+    using Cond = SQLiteHelper::OrCond<
+        SQLiteHelper::EqualValueCond<NameColumn, "Alice">,
+        SQLiteHelper::EqualValueCond<NameColumn, "Bob">
+    >;
     auto results = db.GetTable<UserTable>().Select<NameColumn>()
-            .Where(cond).Results();
+            .Where<Cond>().Results();
     EXPECT_EQ(results.size(), 2);
 }
 
@@ -203,7 +207,7 @@ TEST_F(SQLiteHelperTest, UpdateSingleColumn) {
     db.GetTable<UserTable>().Insert(NameColumn{.value = "OldName"});
 
     db.GetTable<UserTable>().Update(NameColumn{.value = "NewName"})
-            .Where(SQLiteHelper::Equal<NameColumn>("OldName")).Execute();
+            .Where<SQLiteHelper::EqualValueCond<NameColumn, "OldName">>().Execute();
 
     auto results = db.GetTable<UserTable>().Select<NameColumn>().Results();
     EXPECT_EQ(std::get<NameColumn>(results[0]).value, "NewName");
@@ -219,7 +223,7 @@ TEST_F(SQLiteHelperTest, UpdateMultipleColumns) {
     db.GetTable<UserTable>().Update(
         NameColumn{.value = "Bob"},
         AgeColumn{.value = 30}
-    ).Where(SQLiteHelper::Equal<NameColumn>("Alice")).Execute();
+    ).Where<SQLiteHelper::EqualValueCond<NameColumn, "Alice">>().Execute();
 
     auto results = db.GetTable<UserTable>().Select<NameColumn, AgeColumn>().Results();
     EXPECT_EQ(std::get<NameColumn>(results[0]).value, "Bob");
@@ -232,7 +236,7 @@ TEST_F(SQLiteHelperTest, UpdateMultipleRows) {
     db.GetTable<UserTable>().Insert(NameColumn{.value = "Bob"}, AgeColumn{.value = 25});
 
     db.GetTable<UserTable>().Update(AgeColumn{.value = 30})
-            .Where(SQLiteHelper::Equal<AgeColumn>("25")).Execute();
+            .Where<SQLiteHelper::EqualValueCond<AgeColumn, "25">>().Execute();
 
     auto results = db.GetTable<UserTable>().Select<AgeColumn>().Results();
     EXPECT_EQ(results.size(), 2);
@@ -247,7 +251,7 @@ TEST_F(SQLiteHelperTest, DeleteSingleRow) {
     db.GetTable<UserTable>().Insert(NameColumn{.value = "Bob"});
 
     db.GetTable<UserTable>().Delete()
-            .Where(SQLiteHelper::Equal<NameColumn>("Alice")).Execute();
+            .Where<SQLiteHelper::EqualValueCond<NameColumn, "Alice">>().Execute();
 
     auto results = db.GetTable<UserTable>().Select<NameColumn>().Results();
     EXPECT_EQ(results.size(), 1);
@@ -261,7 +265,7 @@ TEST_F(SQLiteHelperTest, DeleteMultipleRows) {
     db.GetTable<UserTable>().Insert(AgeColumn{.value = 30});
 
     db.GetTable<UserTable>().Delete()
-            .Where(SQLiteHelper::Equal<AgeColumn>("20")).Execute();
+            .Where<SQLiteHelper::EqualValueCond<AgeColumn, "20">>().Execute();
 
     auto results = db.GetTable<UserTable>().Select<AgeColumn>().Results();
     EXPECT_EQ(results.size(), 1);
@@ -289,21 +293,21 @@ TEST_F(SQLiteHelperTest, ComplexOperations) {
 
     // 查詢年齡 > 25 的用戶
     auto results1 = db.GetTable<UserTable>().Select<NameColumn, AgeColumn>()
-            .Where(SQLiteHelper::GreaterThan<AgeColumn>("25")).Results();
+            .Where<SQLiteHelper::GreaterThanValueCond<AgeColumn, "25">>().Results();
     EXPECT_EQ(results1.size(), 2);
 
     // 更新 Bob 的分數
     db.GetTable<UserTable>().Update(ScoreColumn{.value = 92.0})
-            .Where(SQLiteHelper::Equal<NameColumn>("Bob")).Execute();
+            .Where<SQLiteHelper::EqualValueCond<NameColumn, "Bob">>().Execute();
 
     // 查詢 Bob 的新分數
     auto results2 = db.GetTable<UserTable>().Select<ScoreColumn>()
-            .Where(SQLiteHelper::Equal<NameColumn>("Bob")).Results();
+            .Where<SQLiteHelper::EqualValueCond<NameColumn, "Bob">>().Results();
     EXPECT_EQ(std::get<ScoreColumn>(results2[0]).value, 92.0);
 
     // 刪除年齡 >= 30 的用戶
     db.GetTable<UserTable>().Delete()
-            .Where(SQLiteHelper::GreaterThanEqual<AgeColumn>("30")).Execute();
+            .Where<SQLiteHelper::GreaterThanEqualValueCond<AgeColumn, "30">>().Execute();
 
     auto results3 = db.GetTable<UserTable>().Select<NameColumn>().Results();
     EXPECT_EQ(results3.size(), 2);
@@ -315,8 +319,8 @@ TEST_F(SQLiteHelperTest, TransactionCommit) {
     db.CreateTransaction([&db](auto &transation) {
         db.GetTable<UserTable>().Insert(NameColumn{.value = "TxUser"}, AgeColumn{.value = 99});
     });
-    auto results = db.GetTable<UserTable>().Select<NameColumn, AgeColumn>().Where(
-        SQLiteHelper::Equal<NameColumn>("TxUser")).Results();
+    auto results = db.GetTable<UserTable>().Select<NameColumn, AgeColumn>()
+            .Where<SQLiteHelper::EqualValueCond<NameColumn, "TxUser">>().Results();
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<AgeColumn>(results[0]).value, 99);
 }
@@ -327,8 +331,8 @@ TEST_F(SQLiteHelperTest, TransactionRollback) {
         db.GetTable<UserTable>().Insert(NameColumn{.value = "TxRollback"}, AgeColumn{.value = 88});
         throw std::runtime_error("Force rollback");
     });
-    auto results = db.GetTable<UserTable>().Select<NameColumn, AgeColumn>().Where(
-        SQLiteHelper::Equal<NameColumn>("TxRollback")).Results();
+    auto results = db.GetTable<UserTable>().Select<NameColumn, AgeColumn>()
+            .Where<SQLiteHelper::EqualValueCond<NameColumn, "TxRollback">>().Results();
     EXPECT_EQ(results.size(), 0);
 }
 
