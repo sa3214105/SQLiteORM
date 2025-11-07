@@ -80,13 +80,33 @@ namespace SQLiteHelper {
         { T::constraint } -> std::convertible_to<column_constraint>;
     };
 
+    template<typename T, ColumnConcept U>
+    struct TableColumn : U {
+        using TableType = T;
+    };
+
+    template<typename T>
+    concept IsTableColumn = requires()
+    {
+        typename T::TableType;
+    };
+
+    template<typename T>
+    constexpr auto GetColumnName() {
+        if constexpr (IsTableColumn<T>) {
+            return T::TableType::name + FixedString(".") + T::name;
+        }else {
+            return T::name;
+        }
+    }
+
     struct EmptyCond {
         constexpr static FixedString condition = " 1 ";
     };
 
     template<typename T1, typename T2>
     struct EqualCond {
-        constexpr static FixedString condition = FixedString(" ") + T1::name + " = " + T2::name;
+        constexpr static FixedString condition = FixedString(" ") + GetColumnName<T1>() + " = " + GetColumnName<T2>();
     };
 
     struct Condition {
@@ -293,34 +313,31 @@ namespace SQLiteHelper {
                 if constexpr (std::is_convertible_v<nullptr_t, T>) {
                     t.value = nullptr;
                 }
-            }else{
+            } else {
                 t.value = sqlite3_column_type(stmt, colIndex);
             }
-
         } else if constexpr (T::type == column_type::INTEGER) {
             if (datatype != SQLITE_INTEGER) {
                 if constexpr (std::is_convertible_v<nullptr_t, T>) {
                     t.value = nullptr;
                 }
-            }else{
+            } else {
                 t.value = sqlite3_column_int(stmt, colIndex);
             }
-
         } else if constexpr (T::type == column_type::REAL) {
             if (datatype != SQLITE_FLOAT) {
                 if constexpr (std::is_convertible_v<nullptr_t, T>) {
                     t.value = nullptr;
                 }
-            }else{
+            } else {
                 t.value = sqlite3_column_double(stmt, colIndex);
             }
-
         } else if constexpr (T::type == column_type::BLOB) {
             if (datatype != SQLITE_BLOB) {
                 if constexpr (std::is_convertible_v<nullptr_t, T>) {
                     t.value = nullptr;
                 }
-            }else {
+            } else {
                 auto pBytes = static_cast<const uint8_t *>(sqlite3_column_blob(stmt, colIndex));
                 auto n = static_cast<size_t>(sqlite3_column_bytes(stmt, colIndex));
                 if (pBytes && n > 0) {
@@ -329,7 +346,6 @@ namespace SQLiteHelper {
                     t.value.clear();
                 }
             }
-
         }
         return t;
     }
@@ -397,10 +413,28 @@ namespace SQLiteHelper {
             const std::string _from_sql;
             std::string _where_sql;
 
+            template<typename T, typename... Ts>
+            std::string GetColumnNames() {
+                if constexpr (IsTableColumn<T>) {
+                    if constexpr (sizeof...(Ts) == 0) {
+                        return std::string(T::TableType::name) + "." + std::string(T::name);
+                    } else {
+                        return std::string(T::TableType::name) + "." + std::string(T::name) + "," +
+                               GetColumnNames<Ts...>();
+                    }
+                } else {
+                    if constexpr (sizeof...(Ts) == 0) {
+                        return std::string(T::name);
+                    } else {
+                        return std::string(T::name) + "," + GetColumnNames<Ts...>();
+                    }
+                }
+            }
+
         public:
             explicit SelectQuery(QueryAble &query_able) : _query_able(query_able),
                                                           _from_sql(" FROM " + query_able.from_sql) {
-                _basic_sql = "SELECT " + GetNames<ResultColumns...>();
+                _basic_sql = "SELECT " + GetColumnNames<ResultColumns...>();
             }
 
             SelectQuery &Where(const Condition &condition) {
@@ -408,7 +442,7 @@ namespace SQLiteHelper {
                 return *this;
             }
 
-            std::vector<std::tuple<ResultColumns...> > Results() {
+            auto Results() {
                 sqlite3_stmt *stmt = nullptr;
                 auto sql = _basic_sql + _from_sql + _where_sql + ";";
                 if (sqlite3_prepare_v2(_query_able.db._dbPtr.get(), sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
@@ -450,7 +484,8 @@ namespace SQLiteHelper {
     class InnerJoinTable : public QueryAble {
     public:
         InnerJoinTable(Database_Base &db) : QueryAble(
-            db, Table1::name + FixedString(" INNER JOIN ") + Table2::name + FixedString(" ON ") + Condition::condition) {
+            db, Table1::name + FixedString(" INNER JOIN ") + Table2::name + FixedString(" ON ") +
+                Condition::condition) {
         }
     };
 
@@ -466,7 +501,8 @@ namespace SQLiteHelper {
     class RightJoinTable : public QueryAble {
     public:
         RightJoinTable(Database_Base &db) : QueryAble(
-            db, Table1::name + FixedString(" RIGHT JOIN ") + Table2::name + FixedString(" ON ") + Condition::condition) {
+            db, Table1::name + FixedString(" RIGHT JOIN ") + Table2::name + FixedString(" ON ") +
+                Condition::condition) {
         }
     };
 
@@ -474,7 +510,8 @@ namespace SQLiteHelper {
     class CrossJoinTable : public QueryAble {
     public:
         CrossJoinTable(Database_Base &db) : QueryAble(
-            db, Table1::name + FixedString(" CROSS JOIN ") + Table2::name + FixedString(" ON ") + Condition::condition) {
+            db, Table1::name + FixedString(" CROSS JOIN ") + Table2::name + FixedString(" ON ") +
+                Condition::condition) {
         }
     };
 
@@ -575,14 +612,6 @@ namespace SQLiteHelper {
             }
         }
 
-        template<typename T>
-        struct TableColumn {
-            constexpr static FixedString name = FixedString(Table::name) + FixedString(".") + T::name;
-            constexpr static column_type type = T::type;
-            inline static column_constraint constraint = T::constraint;
-            decltype(T::value) value;
-        };
-
         template<typename Table2, typename Condition>
         auto FullJoin() {
             return FullJoinTable<Table, Table2, Condition>(this->db);
@@ -606,6 +635,12 @@ namespace SQLiteHelper {
         template<typename Table2, typename Condition>
         auto CrossJoin() {
             return CrossJoinTable<Table, Table2, Condition>(this->db);
+        }
+
+        template<typename... ResultCol>
+        auto Select() {
+            static_assert(isTypeGroupSubset<typeGroup<ResultCol...>, columns>);
+            return QueryAble::Select<ResultCol...>();
         }
 
         template<typename... U>
@@ -646,6 +681,9 @@ namespace SQLiteHelper {
         auto Delete() {
             return DeleteQuery(*this);
         }
+
+        template<typename Col>
+        using TableColumn = TableColumn<Table, Col>;
     };
 
     template<typename... Table>
@@ -730,7 +768,7 @@ namespace SQLiteHelper {
             try {
                 callback(transaction);
                 transaction.Commit();
-            }catch (std::exception &e) {
+            } catch (std::exception &e) {
                 transaction.Rollback();
             }
         }
@@ -740,7 +778,7 @@ namespace SQLiteHelper {
             try {
                 callback();
                 transaction.Commit();
-            }catch (std::exception &e) {
+            } catch (std::exception &e) {
                 transaction.Rollback();
             }
         }
