@@ -312,11 +312,9 @@ TEST_F(SQLiteHelperTest, ComplexOperations) {
 // ============ Transaction 測試 ============
 TEST_F(SQLiteHelperTest, TransactionCommit) {
     SQLiteHelper::Database<UserTable> db("test_database.db");
-    {
-        auto tx = db.CreateTransaction();
-        tx.GetTable<UserTable>().Insert(NameColumn{.value = "TxUser"}, AgeColumn{.value = 99});
-        tx.Commit();
-    }
+    db.CreateTransaction([&db](auto &transation) {
+        db.GetTable<UserTable>().Insert(NameColumn{.value = "TxUser"}, AgeColumn{.value = 99});
+    });
     auto results = db.GetTable<UserTable>().Select<NameColumn, AgeColumn>().Where(
         SQLiteHelper::Equal<NameColumn>("TxUser")).Results();
     EXPECT_EQ(results.size(), 1);
@@ -325,11 +323,10 @@ TEST_F(SQLiteHelperTest, TransactionCommit) {
 
 TEST_F(SQLiteHelperTest, TransactionRollback) {
     SQLiteHelper::Database<UserTable> db("test_database.db");
-    {
-        auto tx = db.CreateTransaction();
-        tx.GetTable<UserTable>().Insert(NameColumn{.value = "TxRollback"}, AgeColumn{.value = 88});
-        tx.Rollback();
-    }
+    db.CreateTransaction([&db](auto &transation ) {
+        db.GetTable<UserTable>().Insert(NameColumn{.value = "TxRollback"}, AgeColumn{.value = 88});
+        throw std::runtime_error("Force rollback");
+    });
     auto results = db.GetTable<UserTable>().Select<NameColumn, AgeColumn>().Where(
         SQLiteHelper::Equal<NameColumn>("TxRollback")).Results();
     EXPECT_EQ(results.size(), 0);

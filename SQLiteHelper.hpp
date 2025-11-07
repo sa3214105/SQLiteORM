@@ -695,11 +695,6 @@ namespace SQLiteHelper {
                     throw std::runtime_error("Failed to commit transaction: " + msg);
                 }
             }
-
-            template<typename T>
-            T &GetTable() {
-                return std::get<T>(_db._tables);
-            }
         };
 
     private:
@@ -730,8 +725,24 @@ namespace SQLiteHelper {
             return std::get<T>(_tables);
         }
 
-        Transaction CreateTransaction() {
-            return Transaction(*this);
+        void CreateTransaction(const std::function<void(Transaction &)> &callback) {
+            Transaction transaction(*this);
+            try {
+                callback(transaction);
+                transaction.Commit();
+            }catch (std::exception &e) {
+                transaction.Rollback();
+            }
+        }
+
+        void CreateTransaction(const std::function<void()> &callback) {
+            Transaction transaction(*this);
+            try {
+                callback();
+                transaction.Commit();
+            }catch (std::exception &e) {
+                transaction.Rollback();
+            }
         }
     };
 }
