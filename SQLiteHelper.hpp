@@ -8,6 +8,7 @@
 #include <string_view>
 #include <stdexcept>
 #include <utility>
+#include <filesystem>
 
 namespace SQLiteHelper {
     template<size_t N = 0>
@@ -22,7 +23,39 @@ namespace SQLiteHelper {
         constexpr operator std::string_view() const {
             return {value, N - 1};
         }
+
+        operator const char *() const {
+            return value;
+        }
+
+        operator const std::string() const {
+            return value;
+        }
     };
+
+    template<std::size_t N1, std::size_t N2>
+    constexpr auto operator+(const FixedString<N1> &a, const FixedString<N2> &b) {
+        char result[N1 + N2 - 1]{};
+        std::copy_n(a.value, N1 - 1, result);
+        std::copy_n(b.value, N2, result + N1 - 1);
+        return FixedString<N1 + N2 - 1>(result);
+    }
+
+    template<std::size_t N1, std::size_t N2>
+    constexpr auto operator+(const FixedString<N1> &a, const char (&b)[N2]) {
+        char result[N1 + N2 - 1]{};
+        std::copy_n(a.value, N1 - 1, result);
+        std::copy_n(b, N2, result + N1 - 1);
+        return FixedString<N1 + N2 - 1>(result);
+    }
+
+    template<std::size_t N1, std::size_t N2>
+    constexpr auto operator+(const char (&a)[N1], const FixedString<N2> &b) {
+        char result[N1 + N2 - 1]{};
+        std::copy_n(a, N1 - 1, result);
+        std::copy_n(b.value, N2, result + N1 - 1);
+        return FixedString<N1 + N2 - 1>(result);
+    }
 
     enum class column_type {
         TEXT,
@@ -47,6 +80,15 @@ namespace SQLiteHelper {
         { T::constraint } -> std::convertible_to<column_constraint>;
     };
 
+    struct EmptyCond {
+        constexpr static FixedString condition = " 1 ";
+    };
+
+    template<typename T1, typename T2>
+    struct EqualCond {
+        constexpr static FixedString condition = FixedString(" ") + T1::name + " = " + T2::name;
+    };
+
     struct Condition {
         std::string condition;
 
@@ -63,62 +105,62 @@ namespace SQLiteHelper {
 
     template<typename T>
     Condition Equal(const std::string &value) {
-        return {.condition = " " + T::name + " = '" + value + "'"};
+        return {.condition = std::string(" ") + std::string(T::name) + " = '" + value + "'"};
     }
 
     template<typename T1, typename T2>
     Condition Equal() {
-        return {.condition = " " + T1::name + " = " + T2::name};
+        return {.condition = std::string(" ") + std::string(T1::name) + " = " + T2::name};
     }
 
     template<typename T>
     Condition NotEqual(const std::string &value) {
-        return {.condition = " " + T::name + " != '" + value + "'"};
+        return {.condition = std::string(" ") + std::string(T::name) + " != '" + value + "'"};
     }
 
     template<typename T1, typename T2>
     Condition NotEqual() {
-        return {.condition = " " + T1::name + " != " + T2::name};
+        return {.condition = std::string(" ") + std::string(T1::name) + " != " + T2::name};
     }
 
     template<typename T>
     Condition GreaterThan(const std::string &value) {
-        return {.condition = " " + T::name + " > '" + value + "'"};
+        return {.condition = std::string(" ") + std::string(T::name) + " > '" + value + "'"};
     }
 
     template<typename T1, typename T2>
     Condition GreaterThan() {
-        return {.condition = " " + T1::name + " > " + T2::name};
+        return {.condition = std::string(" ") + std::string(T1::name) + " > " + T2::name};
     }
 
     template<typename T>
     Condition LessThan(const std::string &value) {
-        return {.condition = " " + T::name + " < '" + value + "'"};
+        return {.condition = std::string(" ") + std::string(T::name) + " < '" + value + "'"};
     }
 
     template<typename T1, typename T2>
     Condition LessThan() {
-        return {.condition = " " + T1::name + " < " + T2::name};
+        return {.condition = std::string(" ") + std::string(T1::name) + " < " + T2::name};
     }
 
     template<typename T>
     Condition GreaterThanEqual(const std::string &value) {
-        return {.condition = T::name + " >= '" + value + "'"};
+        return {.condition = std::string(" ") + std::string(T::name) + " >= '" + value + "'"};
     }
 
     template<typename T1, typename T2>
     Condition GreaterThanEqual() {
-        return {.condition = T1::name + " >= " + T2::name};
+        return {.condition = std::string(" ") + std::string(T1::name) + " >= " + T2::name};
     }
 
     template<typename T>
     Condition LessThanEqual(const std::string &value) {
-        return {.condition = T::name + " <= '" + value + "'"};
+        return {.condition = std::string(" ") + std::string(T::name) + " <= '" + value + "'"};
     }
 
     template<typename T1, typename T2>
     Condition LessThanEqual() {
-        return {.condition = T1::name + " <= " + T2::name};
+        return {.condition = std::string(" ") + std::string(T1::name) + " <= " + T2::name};
     }
 
     template<typename T, typename... Ts>
@@ -207,42 +249,87 @@ namespace SQLiteHelper {
 
 
     template<typename T, typename... Ts>
-    std::string GetFiledNames() {
+    std::string GetNames() {
         if constexpr (sizeof...(Ts) == 0) {
-            return T::name;
+            return std::string(T::name);
         } else {
-            return T::name + "," + GetFiledNames<Ts...>();
+            return std::string(T::name) + "," + GetNames<Ts...>();
         }
     }
 
     template<typename T, typename... Ts>
     std::string GetUpdateField() {
         if constexpr (sizeof...(Ts) == 0) {
-            return std::string(T::name + " = ?");
+            return std::string(std::string(T::name) + " = ?");
         } else {
-            return std::string(T::name + " = ?, " + GetUpdateField<Ts...>());
+            return std::string(std::string(T::name) + " = ?, " + GetUpdateField<Ts...>());
+        }
+    }
+
+    template<typename T, typename... Ts>
+    std::string GetFullJoin() {
+        if constexpr (sizeof...(Ts) == 0) {
+            return std::string(" FULL JOIN ") + std::string(T::table_name) + " ON " + std::string(T::join_condition);
+        } else {
+            return std::string(" FULL JOIN ") + std::string(T::table_name) + " ON " + std::string(T::join_condition) +
+                   " " + GetFullJoin<Ts...>();
         }
     }
 
     template<typename T>
     auto GetValue(sqlite3_stmt *stmt, int colIndex) {
         T t;
+        auto datatype = sqlite3_column_type(stmt, colIndex);
         if constexpr (T::type == column_type::TEXT) {
-            t.value = reinterpret_cast<const char *>(sqlite3_column_text(stmt, colIndex));
-        } else if constexpr (T::type == column_type::NUMERIC) {
-            t.value = sqlite3_column_type(stmt, colIndex);
-        } else if constexpr (T::type == column_type::INTEGER) {
-            t.value = sqlite3_column_int(stmt, colIndex);
-        } else if constexpr (T::type == column_type::REAL) {
-            t.value = sqlite3_column_double(stmt, colIndex);
-        } else if constexpr (T::type == column_type::BLOB) {
-            auto pBytes = static_cast<const uint8_t *>(sqlite3_column_blob(stmt, colIndex));
-            auto n = static_cast<size_t>(sqlite3_column_bytes(stmt, colIndex));
-            if (pBytes && n > 0) {
-                t.value = std::vector<uint8_t>(pBytes, pBytes + n);
+            if (datatype != SQLITE_TEXT) {
+                if constexpr (std::is_convertible_v<nullptr_t, T>) {
+                    t.value = nullptr;
+                }
             } else {
-                t.value.clear();
+                t.value = reinterpret_cast<const char *>(sqlite3_column_text(stmt, colIndex));
             }
+        } else if constexpr (T::type == column_type::NUMERIC) {
+            if (datatype != SQLITE_INTEGER) {
+                if constexpr (std::is_convertible_v<nullptr_t, T>) {
+                    t.value = nullptr;
+                }
+            }else{
+                t.value = sqlite3_column_type(stmt, colIndex);
+            }
+
+        } else if constexpr (T::type == column_type::INTEGER) {
+            if (datatype != SQLITE_INTEGER) {
+                if constexpr (std::is_convertible_v<nullptr_t, T>) {
+                    t.value = nullptr;
+                }
+            }else{
+                t.value = sqlite3_column_int(stmt, colIndex);
+            }
+
+        } else if constexpr (T::type == column_type::REAL) {
+            if (datatype != SQLITE_FLOAT) {
+                if constexpr (std::is_convertible_v<nullptr_t, T>) {
+                    t.value = nullptr;
+                }
+            }else{
+                t.value = sqlite3_column_double(stmt, colIndex);
+            }
+
+        } else if constexpr (T::type == column_type::BLOB) {
+            if (datatype != SQLITE_BLOB) {
+                if constexpr (std::is_convertible_v<nullptr_t, T>) {
+                    t.value = nullptr;
+                }
+            }else {
+                auto pBytes = static_cast<const uint8_t *>(sqlite3_column_blob(stmt, colIndex));
+                auto n = static_cast<size_t>(sqlite3_column_bytes(stmt, colIndex));
+                if (pBytes && n > 0) {
+                    t.value = std::vector<uint8_t>(pBytes, pBytes + n);
+                } else {
+                    t.value.clear();
+                }
+            }
+
         }
         return t;
     }
@@ -282,6 +369,11 @@ namespace SQLiteHelper {
         std::unique_ptr<sqlite3, decltype(&sqlite3_close)> _dbPtr = {nullptr, sqlite3_close};
 
         Database_Base(const std::string &dbPath) : _db_path(dbPath) {
+            // Delete existing DB file if present to ensure a clean database on open
+            std::error_code ec;
+            if (std::filesystem::exists(_db_path, ec)) {
+                std::filesystem::remove(_db_path, ec);
+            }
             sqlite3 *pDb = nullptr;
             int rc = sqlite3_open_v2(_db_path.c_str(), &pDb, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr);
             if (rc != SQLITE_OK) {
@@ -293,21 +385,22 @@ namespace SQLiteHelper {
         virtual ~Database_Base() = default;
     };
 
-    template<FixedString TableName, typename... Columns>
-    class Table {
-        inline static std::string table_name = std::string(static_cast<std::string_view>(TableName));
-        using columns = typeGroup<Columns...>;
+    class QueryAble {
+    protected:
+        std::string from_sql;
         Database_Base &db;
 
-        template<typename... Ts>
+        template<typename... ResultColumns>
         class SelectQuery {
-            const Table &_table;
+            QueryAble &_query_able;
             std::string _basic_sql;
+            const std::string _from_sql;
             std::string _where_sql;
 
         public:
-            explicit SelectQuery(const Table &table) : _table(table) {
-                _basic_sql = "SELECT " + GetFiledNames<Ts...>() + " FROM " + table.table_name;
+            explicit SelectQuery(QueryAble &query_able) : _query_able(query_able),
+                                                          _from_sql(" FROM " + query_able.from_sql) {
+                _basic_sql = "SELECT " + GetNames<ResultColumns...>();
             }
 
             SelectQuery &Where(const Condition &condition) {
@@ -315,15 +408,16 @@ namespace SQLiteHelper {
                 return *this;
             }
 
-            std::vector<std::tuple<Ts...> > Results() {
+            std::vector<std::tuple<ResultColumns...> > Results() {
                 sqlite3_stmt *stmt = nullptr;
-                auto sql = _basic_sql + _where_sql + ";";
-                if (sqlite3_prepare_v2(_table.db._dbPtr.get(), sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-                    throw std::runtime_error("Failed to prepare statement");
+                auto sql = _basic_sql + _from_sql + _where_sql + ";";
+                if (sqlite3_prepare_v2(_query_able.db._dbPtr.get(), sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+                    throw std::runtime_error(
+                        std::string("Failed to prepare statement") + sqlite3_errmsg(_query_able.db._dbPtr.get()));
                 }
-                std::vector<std::tuple<Ts...> > ret;
+                std::vector<std::tuple<ResultColumns...> > ret;
                 while (sqlite3_step(stmt) == SQLITE_ROW) {
-                    ret.push_back(GetRowData<Ts...>(stmt));
+                    ret.push_back(GetRowData<ResultColumns...>(stmt));
                 }
                 if (sqlite3_finalize(stmt) != SQLITE_OK) {
                     throw std::runtime_error("Failed to finalize statement");
@@ -331,6 +425,67 @@ namespace SQLiteHelper {
                 return ret;
             }
         };
+
+    public:
+        explicit QueryAble(Database_Base &db, const std::string &from_sql) : db(db), from_sql(from_sql) {
+        }
+
+        virtual ~QueryAble() = default;
+
+        template<typename... ResultCol>
+        auto Select() {
+            return SelectQuery<ResultCol...>(*this);
+        }
+    };
+
+    template<typename Table1, typename Table2, typename Condition>
+    class FullJoinTable : public QueryAble {
+    public:
+        FullJoinTable(Database_Base &db) : QueryAble(
+            db, Table1::name + FixedString(" FULL JOIN ") + Table2::name + FixedString(" ON ") + Condition::condition) {
+        }
+    };
+
+    template<typename Table1, typename Table2, typename Condition>
+    class InnerJoinTable : public QueryAble {
+    public:
+        InnerJoinTable(Database_Base &db) : QueryAble(
+            db, Table1::name + FixedString(" INNER JOIN ") + Table2::name + FixedString(" ON ") + Condition::condition) {
+        }
+    };
+
+    template<typename Table1, typename Table2, typename Condition>
+    class LeftJoinTable : public QueryAble {
+    public:
+        LeftJoinTable(Database_Base &db) : QueryAble(
+            db, Table1::name + FixedString(" LEFT JOIN ") + Table2::name + FixedString(" ON ") + Condition::condition) {
+        }
+    };
+
+    template<typename Table1, typename Table2, typename Condition>
+    class RightJoinTable : public QueryAble {
+    public:
+        RightJoinTable(Database_Base &db) : QueryAble(
+            db, Table1::name + FixedString(" RIGHT JOIN ") + Table2::name + FixedString(" ON ") + Condition::condition) {
+        }
+    };
+
+    template<typename Table1, typename Table2, typename Condition>
+    class CrossJoinTable : public QueryAble {
+    public:
+        CrossJoinTable(Database_Base &db) : QueryAble(
+            db, Table1::name + FixedString(" CROSS JOIN ") + Table2::name + FixedString(" ON ") + Condition::condition) {
+        }
+    };
+
+    template<FixedString TableName, typename... Columns>
+    class Table : public QueryAble {
+    public:
+        constexpr static FixedString name = TableName;
+        using columns = typeGroup<Columns...>;
+
+    private:
+        Database_Base &db;
 
         template<typename... Ts>
         class UpdateQuery {
@@ -342,11 +497,11 @@ namespace SQLiteHelper {
 
         public:
             UpdateQuery(const Table &table, Ts... ts) : _table(table), datas(std::forward<Ts>(ts)...) {
-                _basic_sql = "UPDATE " + table.table_name + " SET " + GetUpdateField<Ts...>();
+                _basic_sql = std::string("UPDATE ") + std::string(name) + " SET " + GetUpdateField<Ts...>();
             }
 
             UpdateQuery &Where(const Condition &condition) {
-                _where_sql = " WHERE " + condition.condition;
+                _where_sql = std::string(" WHERE ") + condition.condition;
                 return *this;
             }
 
@@ -358,7 +513,7 @@ namespace SQLiteHelper {
                 }
 
                 int index = 1;
-                std::apply([&index, &stmt](auto&... columns) {
+                std::apply([&index, &stmt](auto &... columns) {
                     ((bindValue(stmt, index++, columns)), ...);
                 }, datas);
 
@@ -380,11 +535,11 @@ namespace SQLiteHelper {
 
         public:
             DeleteQuery(const Table &table) : _table(table) {
-                _basic_sql = "DELETE FROM " + table.table_name;
+                _basic_sql = std::string("DELETE FROM ") + std::string(name);
             }
 
             DeleteQuery &Where(const Condition &condition) {
-                _where_sql = " WHERE " + condition.condition;
+                _where_sql = std::string(" WHERE ") + condition.condition;
                 return *this;
             }
 
@@ -406,31 +561,58 @@ namespace SQLiteHelper {
         };
 
     public:
-        explicit Table(Database_Base &db) : db(db) {
-            std::string sql = "CREATE TABLE IF NOT EXISTS " + table_name + " (";
+        explicit Table(Database_Base &db) : QueryAble(db, name), db(db) {
+            std::string sql = std::string("CREATE TABLE IF NOT EXISTS ") + std::string(name) + " (";
             sql += GetColumnDefinitions<Columns...>();
             sql += ");";
             char *errMsg = nullptr;
             int rc = sqlite3_exec(db._dbPtr.get(), sql.c_str(), nullptr, nullptr, &errMsg);
             if (rc != SQLITE_OK) {
-                std::string msg = "SQL error (" + table_name + "): ";
+                std::string msg = std::string("SQL error (") + std::string(name) + "): ";
                 msg += errMsg ? errMsg : "";
                 sqlite3_free(errMsg);
                 throw std::runtime_error(msg);
             }
         }
 
-        template<typename... U>
-        auto Select() {
-            static_assert(isTypeGroupSubset<typeGroup<U...>, columns>);
-            return SelectQuery<U...>(*this);
+        template<typename T>
+        struct TableColumn {
+            constexpr static FixedString name = FixedString(Table::name) + FixedString(".") + T::name;
+            constexpr static column_type type = T::type;
+            inline static column_constraint constraint = T::constraint;
+            decltype(T::value) value;
+        };
+
+        template<typename Table2, typename Condition>
+        auto FullJoin() {
+            return FullJoinTable<Table, Table2, Condition>(this->db);
+        }
+
+        template<typename Table2, typename Condition>
+        auto InnerJoin() {
+            return InnerJoinTable<Table, Table2, Condition>(this->db);
+        }
+
+        template<typename Table2, typename Condition>
+        auto LeftJoin() {
+            return LeftJoinTable<Table, Table2, Condition>(this->db);
+        }
+
+        template<typename Table2, typename Condition>
+        auto RightJoin() {
+            return RightJoinTable<Table, Table2, Condition>(this->db);
+        }
+
+        template<typename Table2, typename Condition>
+        auto CrossJoin() {
+            return CrossJoinTable<Table, Table2, Condition>(this->db);
         }
 
         template<typename... U>
         void Insert(U... values) {
             static_assert(isTypeGroupSubset<typeGroup<U...>, columns>);
-            std::string sql = "INSERT INTO " + table_name + " (";
-            sql += GetFiledNames<U...>();
+            std::string sql = std::string("INSERT INTO ") + std::string(name) + " (";
+            sql += GetNames<U...>();
             sql += ") VALUES (";
             for (auto i = 0; i < sizeof...(U); ++i) {
                 sql += "?, ";
@@ -471,6 +653,7 @@ namespace SQLiteHelper {
     public:
         class Transaction {
             friend class Database;
+
         private:
             Database &_db;
             bool _isCommittedOrRolledBack = false;
@@ -498,7 +681,7 @@ namespace SQLiteHelper {
             void Rollback() {
                 _isCommittedOrRolledBack = true;
                 char *errMsg = nullptr;
-                if (sqlite3_exec(_db._dbPtr.get(), "ROLLBACK;", nullptr, nullptr, &errMsg)!= SQLITE_OK) {
+                if (sqlite3_exec(_db._dbPtr.get(), "ROLLBACK;", nullptr, nullptr, &errMsg) != SQLITE_OK) {
                     std::string msg = errMsg ? errMsg : "Unknown error";
                     throw std::runtime_error("Failed to commit transaction: " + msg);
                 }
@@ -507,7 +690,7 @@ namespace SQLiteHelper {
             void Commit() {
                 _isCommittedOrRolledBack = true;
                 char *errMsg = nullptr;
-                if (sqlite3_exec(_db._dbPtr.get(), "COMMIT;", nullptr, nullptr, &errMsg)!= SQLITE_OK) {
+                if (sqlite3_exec(_db._dbPtr.get(), "COMMIT;", nullptr, nullptr, &errMsg) != SQLITE_OK) {
                     std::string msg = errMsg ? errMsg : "Unknown error";
                     throw std::runtime_error("Failed to commit transaction: " + msg);
                 }
@@ -522,7 +705,13 @@ namespace SQLiteHelper {
     private:
         std::tuple<Table...> _tables;
 
-        sqlite3 *openSQlite() {
+        sqlite3 *openSQlite(bool removeExisting = true) {
+            if (removeExisting) {
+                std::error_code ec; // non-throwing removal
+                if (std::filesystem::exists(_db_path, ec)) {
+                    std::filesystem::remove(_db_path, ec);
+                }
+            }
             sqlite3 *pDb = nullptr;
             int rc = sqlite3_open_v2(_db_path.c_str(), &pDb, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr);
             if (rc != SQLITE_OK) {

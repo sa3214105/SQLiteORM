@@ -3,6 +3,10 @@ project(SQLiteHelper)
 
 set(CMAKE_CXX_STANDARD 20)
 
+add_library(SQLiteHelper INTERFACE)
+target_sources(SQLiteHelper INTERFACE SQLiteHelper.hpp)
+target_include_directories(SQLiteHelper INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+
 # Coverage option and flags
 option(ENABLE_COVERAGE "Enable code coverage" OFF)
 if(ENABLE_COVERAGE)
@@ -17,20 +21,29 @@ if(ENABLE_COVERAGE)
     endif()
 endif()
 
-add_library(SQLiteHelper INTERFACE)
-target_sources(SQLiteHelper INTERFACE SQLiteHelper.hpp)
-target_include_directories(SQLiteHelper INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
-
 option(ENABLE_TESTS "Enable building tests" ON)
 if(ENABLE_TESTS AND CMAKE_BUILD_TYPE STREQUAL "Debug")
-    find_package(SQLite3 REQUIRED)
+    #find_package(SQLite3 REQUIRED)
+
+    add_library(sqlite3_static STATIC
+            external/sqlite/sqlite3.c
+    )
+    target_include_directories(sqlite3_static PUBLIC `extern/sqlite`)
+    target_compile_definitions(sqlite3_static PRIVATE
+            SQLITE_OMIT_LOAD_EXTENSION=1
+            SQLITE_THREADSAFE=2
+    )
+    if(MSVC)
+        target_compile_definitions(sqlite3_static PRIVATE _CRT_SECURE_NO_WARNINGS)
+    endif()
+
     add_subdirectory(external/googletest)
     file(GLOB_RECURSE TEST_FILES tests/*.cpp)
     list(FILTER SRC_FILES EXCLUDE REGEX "(^|[/\\])main\.cpp$")
     add_executable(SQLiteHelper_Test ${TEST_FILES} ${SRC_FILES})
     target_include_directories(SQLiteHelper_Test PRIVATE external/gltFX-DataTransferStruct)
     target_include_directories(SQLiteHelper_Test PRIVATE external/EnvHelper)
-    target_link_libraries(SQLiteHelper_Test PRIVATE SQLiteHelper gtest gtest_main SQLite::SQLite3)
+    target_link_libraries(SQLiteHelper_Test PRIVATE SQLiteHelper gtest gtest_main sqlite3_static)
 
     # Apply coverage flags to test target
     if(ENABLE_COVERAGE)
