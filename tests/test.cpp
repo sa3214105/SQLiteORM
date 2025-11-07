@@ -67,120 +67,120 @@ protected:
 // ============ Insert 測試 ============
 TEST_F(SQLiteHelperTest, InsertSingleColumn) {
     SQLiteHelper::Database<UserTable> db("test_database.db");
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Alice"});
-    auto results = db.GetTable<UserTable>().Select<NameColumn>().Results();
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"));
+    auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>>().Results();
     EXPECT_EQ(results.size(), 1);
-    EXPECT_EQ(std::get<NameColumn>(results[0]).value, "Alice");
+    EXPECT_EQ(std::get<UserTable::TableColumn<NameColumn>>(results[0]).value, "Alice");
 }
 
 TEST_F(SQLiteHelperTest, InsertMultipleColumns) {
     SQLiteHelper::Database<UserTable> db("test_database.db");
     db.GetTable<UserTable>().Insert(
-        NameColumn{.value = "Bob"},
-        AgeColumn{.value = 30},
-        ScoreColumn{.value = 95.5}
+        UserTable::MakeTableColumn<NameColumn>("Bob"),
+        UserTable::MakeTableColumn<AgeColumn>(30),
+        UserTable::MakeTableColumn<ScoreColumn>(95.5)
     );
-    auto results = db.GetTable<UserTable>().Select<NameColumn, AgeColumn, ScoreColumn>().Results();
+    auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>, UserTable::TableColumn<AgeColumn>, UserTable::TableColumn<ScoreColumn>>().Results();
     EXPECT_EQ(results.size(), 1);
-    EXPECT_EQ(std::get<NameColumn>(results[0]).value, "Bob");
-    EXPECT_EQ(std::get<AgeColumn>(results[0]).value, 30);
-    EXPECT_EQ(std::get<ScoreColumn>(results[0]).value, 95.5);
+    EXPECT_EQ(std::get<UserTable::TableColumn<NameColumn>>(results[0]).value, "Bob");
+    EXPECT_EQ(std::get<UserTable::TableColumn<AgeColumn>>(results[0]).value, 30);
+    EXPECT_EQ(std::get<UserTable::TableColumn<ScoreColumn>>(results[0]).value, 95.5);
 }
 
 TEST_F(SQLiteHelperTest, InsertMultipleRows) {
     SQLiteHelper::Database<UserTable> db("test_database.db");
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Alice"});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Bob"});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Charlie"});
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Bob"));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Charlie"));
 
-    auto results = db.GetTable<UserTable>().Select<NameColumn>().Results();
+    auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>>().Results();
     EXPECT_EQ(results.size(), 3);
 }
 
 // ============ Select 測試 ============
 TEST_F(SQLiteHelperTest, SelectAllRows) {
     SQLiteHelper::Database<UserTable> db("test_database.db");
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "User1"}, AgeColumn{.value = 20});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "User2"}, AgeColumn{.value = 25});
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>( "User1"), UserTable::MakeTableColumn<AgeColumn>(20));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>( "User2"), UserTable::MakeTableColumn<AgeColumn>(25));
 
-    auto results = db.GetTable<UserTable>().Select<NameColumn, AgeColumn>().Results();
+    auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>, UserTable::TableColumn<AgeColumn>>().Results();
     EXPECT_EQ(results.size(), 2);
 }
 
 TEST_F(SQLiteHelperTest, SelectSingleColumn) {
     SQLiteHelper::Database<UserTable> db("test_database.db");
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Test"}, AgeColumn{.value = 25});
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Test"), UserTable::MakeTableColumn<AgeColumn>(25));
 
-    auto results = db.GetTable<UserTable>().Select<NameColumn>().Results();
+    auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>>().Results();
     EXPECT_EQ(results.size(), 1);
-    EXPECT_EQ(std::get<NameColumn>(results[0]).value, "Test");
+    EXPECT_EQ(std::get<UserTable::TableColumn<NameColumn>>(results[0]).value, "Test");
 }
 
 // ============ Where 條件測試 ============
 TEST_F(SQLiteHelperTest, WhereEqual) {
     SQLiteHelper::Database<UserTable> db("test_database.db");
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Alice"});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Bob"});
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Bob"));
 
-    auto results = db.GetTable<UserTable>().Select<NameColumn>()
+    auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>>()
             .Where<SQLiteHelper::EqualValueCond<NameColumn, "Alice">>().Results();
     EXPECT_EQ(results.size(), 1);
-    EXPECT_EQ(std::get<NameColumn>(results[0]).value, "Alice");
+    EXPECT_EQ(std::get<UserTable::TableColumn<NameColumn>>(results[0]).value, "Alice");
 }
 
 TEST_F(SQLiteHelperTest, WhereNotEqual) {
     SQLiteHelper::Database<UserTable> db("test_database.db");
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Alice"});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Bob"});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Charlie"});
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Bob"));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Charlie"));
 
-    auto results = db.GetTable<UserTable>().Select<NameColumn>()
+    auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>>()
             .Where<SQLiteHelper::NotEqualValueCond<NameColumn, "Alice">>().Results();
     EXPECT_EQ(results.size(), 2);
 }
 
 TEST_F(SQLiteHelperTest, WhereGreaterThan) {
     SQLiteHelper::Database<UserTable> db("test_database.db");
-    db.GetTable<UserTable>().Insert(AgeColumn{.value = 20});
-    db.GetTable<UserTable>().Insert(AgeColumn{.value = 25});
-    db.GetTable<UserTable>().Insert(AgeColumn{.value = 30});
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(20));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(25));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(30));
 
-    auto results = db.GetTable<UserTable>().Select<AgeColumn>()
+    auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<AgeColumn>>()
             .Where<SQLiteHelper::GreaterThanValueCond<AgeColumn, 25>>().Results();
     EXPECT_EQ(results.size(), 1);
-    EXPECT_EQ(std::get<AgeColumn>(results[0]).value, 30);
+    EXPECT_EQ(std::get<UserTable::TableColumn<AgeColumn>>(results[0]).value, 30);
 }
 
 TEST_F(SQLiteHelperTest, WhereLessThan) {
     SQLiteHelper::Database<UserTable> db("test_database.db");
-    db.GetTable<UserTable>().Insert(AgeColumn{.value = 20});
-    db.GetTable<UserTable>().Insert(AgeColumn{.value = 25});
-    db.GetTable<UserTable>().Insert(AgeColumn{.value = 30});
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(20));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(25));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(30));
 
-    auto results = db.GetTable<UserTable>().Select<AgeColumn>()
+    auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<AgeColumn>>()
             .Where<SQLiteHelper::LessThanValueCond<AgeColumn, "25">>().Results();
     EXPECT_EQ(results.size(), 1);
-    EXPECT_EQ(std::get<AgeColumn>(results[0]).value, 20);
+    EXPECT_EQ(std::get<UserTable::TableColumn<AgeColumn>>(results[0]).value, 20);
 }
 
 TEST_F(SQLiteHelperTest, WhereGreaterThanEqual) {
     SQLiteHelper::Database<UserTable> db("test_database.db");
-    db.GetTable<UserTable>().Insert(AgeColumn{.value = 20});
-    db.GetTable<UserTable>().Insert(AgeColumn{.value = 25});
-    db.GetTable<UserTable>().Insert(AgeColumn{.value = 30});
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(20));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(25));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(30));
 
-    auto results = db.GetTable<UserTable>().Select<AgeColumn>()
+    auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<AgeColumn>>()
             .Where<SQLiteHelper::GreaterThanEqualValueCond<AgeColumn, "25">>().Results();
     EXPECT_EQ(results.size(), 2);
 }
 
 TEST_F(SQLiteHelperTest, WhereLessThanEqual) {
     SQLiteHelper::Database<UserTable> db("test_database.db");
-    db.GetTable<UserTable>().Insert(AgeColumn{.value = 20});
-    db.GetTable<UserTable>().Insert(AgeColumn{.value = 25});
-    db.GetTable<UserTable>().Insert(AgeColumn{.value = 30});
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(20));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(25));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(30));
 
-    auto results = db.GetTable<UserTable>().Select<AgeColumn>()
+    auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<AgeColumn>>()
             .Where<SQLiteHelper::LessThanEqualValueCond<AgeColumn, "25">>().Results();
     EXPECT_EQ(results.size(), 2);
 }
@@ -188,31 +188,31 @@ TEST_F(SQLiteHelperTest, WhereLessThanEqual) {
 // ============ 邏輯運算符測試 (AND / OR) ============
 TEST_F(SQLiteHelperTest, WhereAND) {
     SQLiteHelper::Database<UserTable> db("test_database.db");
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Alice"}, AgeColumn{.value = 25});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Bob"}, AgeColumn{.value = 30});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Alice"}, AgeColumn{.value = 35});
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"), UserTable::MakeTableColumn<AgeColumn>(25));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Bob"), UserTable::MakeTableColumn<AgeColumn>(30));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"), UserTable::MakeTableColumn<AgeColumn>(35));
 
     using Cond = SQLiteHelper::AndCond<
         SQLiteHelper::EqualValueCond<NameColumn, "Alice">,
         SQLiteHelper::GreaterThanValueCond<AgeColumn, "25">
     >;
-    auto results = db.GetTable<UserTable>().Select<NameColumn, AgeColumn>()
+    auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>, UserTable::TableColumn<AgeColumn>>()
             .Where<Cond>().Results();
     EXPECT_EQ(results.size(), 1);
-    EXPECT_EQ(std::get<AgeColumn>(results[0]).value, 35);
+    EXPECT_EQ(std::get<UserTable::TableColumn<AgeColumn>>(results[0]).value, 35);
 }
 
 TEST_F(SQLiteHelperTest, WhereOR) {
     SQLiteHelper::Database<UserTable> db("test_database.db");
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Alice"}, AgeColumn{.value = 25});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Bob"}, AgeColumn{.value = 30});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Charlie"}, AgeColumn{.value = 35});
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"), UserTable::MakeTableColumn<AgeColumn>(25));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Bob"), UserTable::MakeTableColumn<AgeColumn>(30));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Charlie"), UserTable::MakeTableColumn<AgeColumn>(35));
 
     using Cond = SQLiteHelper::OrCond<
         SQLiteHelper::EqualValueCond<NameColumn, "Alice">,
         SQLiteHelper::EqualValueCond<NameColumn, "Bob">
     >;
-    auto results = db.GetTable<UserTable>().Select<NameColumn>()
+    auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>>()
             .Where<Cond>().Results();
     EXPECT_EQ(results.size(), 2);
 }
@@ -220,81 +220,81 @@ TEST_F(SQLiteHelperTest, WhereOR) {
 // ============ Update 測試 ============
 TEST_F(SQLiteHelperTest, UpdateSingleColumn) {
     SQLiteHelper::Database<UserTable> db("test_database.db");
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "OldName"});
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("OldName"));
 
-    db.GetTable<UserTable>().Update(NameColumn{.value = "NewName"})
+    db.GetTable<UserTable>().Update(UserTable::MakeTableColumn<NameColumn>("NewName"))
             .Where<SQLiteHelper::EqualValueCond<NameColumn, "OldName">>().Execute();
 
-    auto results = db.GetTable<UserTable>().Select<NameColumn>().Results();
-    EXPECT_EQ(std::get<NameColumn>(results[0]).value, "NewName");
+    auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>>().Results();
+    EXPECT_EQ(std::get<UserTable::TableColumn<NameColumn>>(results[0]).value, "NewName");
 }
 
 TEST_F(SQLiteHelperTest, UpdateMultipleColumns) {
     SQLiteHelper::Database<UserTable> db("test_database.db");
     db.GetTable<UserTable>().Insert(
-        NameColumn{.value = "Alice"},
-        AgeColumn{.value = 20}
+        UserTable::MakeTableColumn<NameColumn>("Alice"),
+        UserTable::MakeTableColumn<AgeColumn>(20)
     );
 
     db.GetTable<UserTable>().Update(
-        NameColumn{.value = "Bob"},
-        AgeColumn{.value = 30}
+        UserTable::MakeTableColumn<NameColumn>("Bob"),
+        UserTable::MakeTableColumn<AgeColumn>(30)
     ).Where<SQLiteHelper::EqualValueCond<NameColumn, "Alice">>().Execute();
 
-    auto results = db.GetTable<UserTable>().Select<NameColumn, AgeColumn>().Results();
-    EXPECT_EQ(std::get<NameColumn>(results[0]).value, "Bob");
-    EXPECT_EQ(std::get<AgeColumn>(results[0]).value, 30);
+    auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>, UserTable::TableColumn<AgeColumn>>().Results();
+    EXPECT_EQ(std::get<UserTable::TableColumn<NameColumn>>(results[0]).value, "Bob");
+    EXPECT_EQ(std::get<UserTable::TableColumn<AgeColumn>>(results[0]).value, 30);
 }
 
 TEST_F(SQLiteHelperTest, UpdateMultipleRows) {
     SQLiteHelper::Database<UserTable> db("test_database.db");
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Alice"}, AgeColumn{.value = 25});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Bob"}, AgeColumn{.value = 25});
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"), UserTable::MakeTableColumn<AgeColumn>(25));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Bob"), UserTable::MakeTableColumn<AgeColumn>(25));
 
-    db.GetTable<UserTable>().Update(AgeColumn{.value = 30})
+    db.GetTable<UserTable>().Update(UserTable::MakeTableColumn<AgeColumn>(30))
             .Where<SQLiteHelper::EqualValueCond<AgeColumn, "25">>().Execute();
 
-    auto results = db.GetTable<UserTable>().Select<AgeColumn>().Results();
+    auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<AgeColumn>>().Results();
     EXPECT_EQ(results.size(), 2);
-    EXPECT_EQ(std::get<AgeColumn>(results[0]).value, 30);
-    EXPECT_EQ(std::get<AgeColumn>(results[1]).value, 30);
+    EXPECT_EQ(std::get<UserTable::TableColumn<AgeColumn>>(results[0]).value, 30);
+    EXPECT_EQ(std::get<UserTable::TableColumn<AgeColumn>>(results[1]).value, 30);
 }
 
 // ============ Delete 測試 ============
 TEST_F(SQLiteHelperTest, DeleteSingleRow) {
     SQLiteHelper::Database<UserTable> db("test_database.db");
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Alice"});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Bob"});
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Bob"));
 
     db.GetTable<UserTable>().Delete()
             .Where<SQLiteHelper::EqualValueCond<NameColumn, "Alice">>().Execute();
 
-    auto results = db.GetTable<UserTable>().Select<NameColumn>().Results();
+    auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>>().Results();
     EXPECT_EQ(results.size(), 1);
-    EXPECT_EQ(std::get<NameColumn>(results[0]).value, "Bob");
+    EXPECT_EQ(std::get<UserTable::TableColumn<NameColumn>>(results[0]).value, "Bob");
 }
 
 TEST_F(SQLiteHelperTest, DeleteMultipleRows) {
     SQLiteHelper::Database<UserTable> db("test_database.db");
-    db.GetTable<UserTable>().Insert(AgeColumn{.value = 20});
-    db.GetTable<UserTable>().Insert(AgeColumn{.value = 20});
-    db.GetTable<UserTable>().Insert(AgeColumn{.value = 30});
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(20));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(20));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(30));
 
     db.GetTable<UserTable>().Delete()
             .Where<SQLiteHelper::EqualValueCond<AgeColumn, "20">>().Execute();
 
-    auto results = db.GetTable<UserTable>().Select<AgeColumn>().Results();
+    auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<AgeColumn>>().Results();
     EXPECT_EQ(results.size(), 1);
 }
 
 TEST_F(SQLiteHelperTest, DeleteAllRows) {
     SQLiteHelper::Database<UserTable> db("test_database.db");
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Alice"});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Bob"});
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Bob"));
 
     db.GetTable<UserTable>().Delete().Execute();
 
-    auto results = db.GetTable<UserTable>().Select<NameColumn>().Results();
+    auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>>().Results();
     EXPECT_EQ(results.size(), 0);
 }
 
@@ -303,29 +303,29 @@ TEST_F(SQLiteHelperTest, ComplexOperations) {
     SQLiteHelper::Database<UserTable> db("test_database.db");
 
     // 插入數據
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Alice"}, AgeColumn{.value = 25}, ScoreColumn{.value = 90.0});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Bob"}, AgeColumn{.value = 30}, ScoreColumn{.value = 85.0});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Charlie"}, AgeColumn{.value = 28}, ScoreColumn{.value = 95.0});
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"), UserTable::MakeTableColumn<AgeColumn>(25), UserTable::MakeTableColumn<ScoreColumn>(90.0));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Bob"), UserTable::MakeTableColumn<AgeColumn>(30), UserTable::MakeTableColumn<ScoreColumn>(85.0));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Charlie"), UserTable::MakeTableColumn<AgeColumn>(28), UserTable::MakeTableColumn<ScoreColumn>(95.0));
 
     // 查詢年齡 > 25 的用戶
-    auto results1 = db.GetTable<UserTable>().Select<NameColumn, AgeColumn>()
+    auto results1 = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>, UserTable::TableColumn<AgeColumn>>()
             .Where<SQLiteHelper::GreaterThanValueCond<AgeColumn, "25">>().Results();
     EXPECT_EQ(results1.size(), 2);
 
     // 更新 Bob 的分數
-    db.GetTable<UserTable>().Update(ScoreColumn{.value = 92.0})
+    db.GetTable<UserTable>().Update(UserTable::MakeTableColumn<ScoreColumn>(92.0))
             .Where<SQLiteHelper::EqualValueCond<NameColumn, "Bob">>().Execute();
 
     // 查詢 Bob 的新分數
-    auto results2 = db.GetTable<UserTable>().Select<ScoreColumn>()
+    auto results2 = db.GetTable<UserTable>().Select<UserTable::TableColumn<ScoreColumn>>()
             .Where<SQLiteHelper::EqualValueCond<NameColumn, "Bob">>().Results();
-    EXPECT_EQ(std::get<ScoreColumn>(results2[0]).value, 92.0);
+    EXPECT_EQ(std::get<UserTable::TableColumn<ScoreColumn>>(results2[0]).value, 92.0);
 
     // 刪除年齡 >= 30 的用戶
     db.GetTable<UserTable>().Delete()
             .Where<SQLiteHelper::GreaterThanEqualValueCond<AgeColumn, "30">>().Execute();
 
-    auto results3 = db.GetTable<UserTable>().Select<NameColumn>().Results();
+    auto results3 = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>>().Results();
     EXPECT_EQ(results3.size(), 2);
 }
 
@@ -333,21 +333,21 @@ TEST_F(SQLiteHelperTest, ComplexOperations) {
 TEST_F(SQLiteHelperTest, TransactionCommit) {
     SQLiteHelper::Database<UserTable> db("test_database.db");
     db.CreateTransaction([&db](auto &transation) {
-        db.GetTable<UserTable>().Insert(NameColumn{.value = "TxUser"}, AgeColumn{.value = 99});
+        db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("TxUser"), UserTable::MakeTableColumn<AgeColumn>(99));
     });
-    auto results = db.GetTable<UserTable>().Select<NameColumn, AgeColumn>()
+    auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>, UserTable::TableColumn<AgeColumn>>()
             .Where<SQLiteHelper::EqualValueCond<NameColumn, "TxUser">>().Results();
     EXPECT_EQ(results.size(), 1);
-    EXPECT_EQ(std::get<AgeColumn>(results[0]).value, 99);
+    EXPECT_EQ(std::get<UserTable::TableColumn<AgeColumn>>(results[0]).value, 99);
 }
 
 TEST_F(SQLiteHelperTest, TransactionRollback) {
     SQLiteHelper::Database<UserTable> db("test_database.db");
     db.CreateTransaction([&db](auto &transation ) {
-        db.GetTable<UserTable>().Insert(NameColumn{.value = "TxRollback"}, AgeColumn{.value = 88});
+        db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("TxRollback"), UserTable::MakeTableColumn<AgeColumn>(88));
         throw std::runtime_error("Force rollback");
     });
-    auto results = db.GetTable<UserTable>().Select<NameColumn, AgeColumn>()
+    auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>, UserTable::TableColumn<AgeColumn>>()
             .Where<SQLiteHelper::EqualValueCond<NameColumn, "TxRollback">>().Results();
     EXPECT_EQ(results.size(), 0);
 }
@@ -358,13 +358,13 @@ TEST_F(SQLiteHelperTest, InnerJoinBasic) {
     db.GetTable<UserTable>().Delete().Execute();
     db.GetTable<DeptTable>().Delete().Execute();
     // UserTable: Alice, Bob, Charlie, David
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Alice"}, AgeColumn{.value = 20});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Bob"}, AgeColumn{.value = 30});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Charlie"}, AgeColumn{.value = 40});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "David"}, AgeColumn{.value = 50});
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"), UserTable::MakeTableColumn<AgeColumn>(20));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Bob"), UserTable::MakeTableColumn<AgeColumn>(30));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Charlie"), UserTable::MakeTableColumn<AgeColumn>(40));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("David"), UserTable::MakeTableColumn<AgeColumn>(50));
     // DeptTable: Alice, David (只有交集部分)
-    db.GetTable<DeptTable>().Insert(DeptColumn{.value = "HR"}, NameColumn{.value = "Alice"});
-    db.GetTable<DeptTable>().Insert(DeptColumn{.value = "IT"}, NameColumn{.value = "David"});
+    db.GetTable<DeptTable>().Insert(DeptTable::MakeTableColumn<DeptColumn>("HR"), DeptTable::MakeTableColumn<NameColumn>("Alice"));
+    db.GetTable<DeptTable>().Insert(DeptTable::MakeTableColumn<DeptColumn>("IT"), DeptTable::MakeTableColumn<NameColumn>("David"));
 
     // InnerJoin on NameColumn - 只返回交集 (Alice, David)
     using _NameColumn = UserTable::TableColumn<NameColumn>;
@@ -390,14 +390,14 @@ TEST_F(SQLiteHelperTest, LeftJoinBasic) {
     db.GetTable<UserTable>().Delete().Execute();
     db.GetTable<DeptTable>().Delete().Execute();
     // UserTable: Alice, Bob, Charlie, David
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Alice"}, AgeColumn{.value = 20});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Bob"}, AgeColumn{.value = 30});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Charlie"}, AgeColumn{.value = 40});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "David"}, AgeColumn{.value = 50});
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"), UserTable::MakeTableColumn<AgeColumn>(20));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Bob"), UserTable::MakeTableColumn<AgeColumn>(30));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Charlie"), UserTable::MakeTableColumn<AgeColumn>(40));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("David"), UserTable::MakeTableColumn<AgeColumn>(50));
     // DeptTable: Alice, David, Eve
-    db.GetTable<DeptTable>().Insert(DeptColumn{.value = "HR"}, NameColumn{.value = "Alice"});
-    db.GetTable<DeptTable>().Insert(DeptColumn{.value = "IT"}, NameColumn{.value = "David"});
-    db.GetTable<DeptTable>().Insert(DeptColumn{.value = "Sales"}, NameColumn{.value = "Eve"});
+    db.GetTable<DeptTable>().Insert(DeptTable::MakeTableColumn<DeptColumn>("HR"), DeptTable::MakeTableColumn<NameColumn>("Alice"));
+    db.GetTable<DeptTable>().Insert(DeptTable::MakeTableColumn<DeptColumn>("IT"), DeptTable::MakeTableColumn<NameColumn>("David"));
+    db.GetTable<DeptTable>().Insert(DeptTable::MakeTableColumn<DeptColumn>("Sales"), DeptTable::MakeTableColumn<NameColumn>("Eve"));
 
     // LeftJoin - 返回左表的所有行 (Alice, Bob, Charlie, David)
     using _NameColumn = UserTable::TableColumn<NameColumn>;
@@ -425,12 +425,12 @@ TEST_F(SQLiteHelperTest, RightJoinBasic) {
     db.GetTable<UserTable>().Delete().Execute();
     db.GetTable<DeptTable>().Delete().Execute();
     // UserTable: Alice, Bob
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Alice"}, AgeColumn{.value = 20});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Bob"}, AgeColumn{.value = 30});
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"), UserTable::MakeTableColumn<AgeColumn>(20));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Bob"), UserTable::MakeTableColumn<AgeColumn>(30));
     // DeptTable: Alice, David, Eve (比左表多)
-    db.GetTable<DeptTable>().Insert(DeptColumn{.value = "HR"}, NameColumn{.value = "Alice"});
-    db.GetTable<DeptTable>().Insert(DeptColumn{.value = "IT"}, NameColumn{.value = "David"});
-    db.GetTable<DeptTable>().Insert(DeptColumn{.value = "Sales"}, NameColumn{.value = "Eve"});
+    db.GetTable<DeptTable>().Insert(DeptTable::MakeTableColumn<DeptColumn>("HR"), DeptTable::MakeTableColumn<NameColumn>("Alice"));
+    db.GetTable<DeptTable>().Insert(DeptTable::MakeTableColumn<DeptColumn>("IT"), DeptTable::MakeTableColumn<NameColumn>("David"));
+    db.GetTable<DeptTable>().Insert(DeptTable::MakeTableColumn<DeptColumn>("Sales"), DeptTable::MakeTableColumn<NameColumn>("Eve"));
 
     // RightJoin - 返回右表的所有行 (Alice, David, Eve)
     using _NameColumn = UserTable::TableColumn<NameColumn>;
@@ -450,11 +450,11 @@ TEST_F(SQLiteHelperTest, CrossJoinBasic) {
     db.GetTable<UserTable>().Delete().Execute();
     db.GetTable<DeptTable>().Delete().Execute();
     // UserTable: Alice, Bob
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Alice"}, AgeColumn{.value = 20});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Bob"}, AgeColumn{.value = 30});
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"), UserTable::MakeTableColumn<AgeColumn>(20));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Bob"), UserTable::MakeTableColumn<AgeColumn>(30));
     // DeptTable: HR, IT
-    db.GetTable<DeptTable>().Insert(DeptColumn{.value = "HR"}, NameColumn{.value = "X"});
-    db.GetTable<DeptTable>().Insert(DeptColumn{.value = "IT"}, NameColumn{.value = "Y"});
+    db.GetTable<DeptTable>().Insert(DeptTable::MakeTableColumn<DeptColumn>("HR"), DeptTable::MakeTableColumn<NameColumn>("X"));
+    db.GetTable<DeptTable>().Insert(DeptTable::MakeTableColumn<DeptColumn>("IT"), DeptTable::MakeTableColumn<NameColumn>("Y"));
 
     // CrossJoin - 笛卡爾乘積 (2 x 2 = 4)
     using _NameColumn = UserTable::TableColumn<NameColumn>;
@@ -473,13 +473,13 @@ TEST_F(SQLiteHelperTest, FullJoinBasic) {
     db.GetTable<UserTable>().Delete().Execute();
     db.GetTable<DeptTable>().Delete().Execute();
     // UserTable: Alice, Bob, Charlie
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Alice"}, AgeColumn{.value = 20});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Bob"}, AgeColumn{.value = 30});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Charlie"}, AgeColumn{.value = 40});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "David"}, AgeColumn{.value = 50});
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"), UserTable::MakeTableColumn<AgeColumn>(20));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Bob"), UserTable::MakeTableColumn<AgeColumn>(30));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Charlie"), UserTable::MakeTableColumn<AgeColumn>(40));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("David"), UserTable::MakeTableColumn<AgeColumn>(50));
     // DeptTable: Alice, David
-    db.GetTable<DeptTable>().Insert(DeptColumn{.value = "HR"}, NameColumn{.value = "Alice"});
-    db.GetTable<DeptTable>().Insert(DeptColumn{.value = "IT"}, NameColumn{.value = "David"});
+    db.GetTable<DeptTable>().Insert(DeptTable::MakeTableColumn<DeptColumn>("HR"), DeptTable::MakeTableColumn<NameColumn>("Alice"));
+    db.GetTable<DeptTable>().Insert(DeptTable::MakeTableColumn<DeptColumn>("IT"), DeptTable::MakeTableColumn<NameColumn>("David"));
     // FullJoin on NameColumn
     using _NameColumn = UserTable::TableColumn<NameColumn>;
     using _AgeColumn = UserTable::TableColumn<AgeColumn>;
@@ -511,19 +511,19 @@ TEST_F(SQLiteHelperTest, MultiJoin_Inner_Inner_ThreeTables) {
     db.GetTable<CountryTable>().Delete().Execute();
 
     // users
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Alice"});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Bob"});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Eve"});
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Bob"));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Eve"));
 
     // cities
-    db.GetTable<CityTable>().Insert(NameColumn{.value = "Alice"}, CityColumn{.value = "Paris"});
-    db.GetTable<CityTable>().Insert(NameColumn{.value = "Bob"}, CityColumn{.value = "Tokyo"});
-    db.GetTable<CityTable>().Insert(NameColumn{.value = "Mallory"}, CityColumn{.value = "Berlin"});
+    db.GetTable<CityTable>().Insert(CityTable::MakeTableColumn<NameColumn>("Alice"), CityTable::MakeTableColumn<CityColumn>("Paris"));
+    db.GetTable<CityTable>().Insert(CityTable::MakeTableColumn<NameColumn>("Bob"), CityTable::MakeTableColumn<CityColumn>("Tokyo"));
+    db.GetTable<CityTable>().Insert(CityTable::MakeTableColumn<NameColumn>("Mallory"), CityTable::MakeTableColumn<CityColumn>("Berlin"));
 
     // countries
-    db.GetTable<CountryTable>().Insert(CityColumn{.value = "Paris"}, CountryColumn{.value = "France"});
-    db.GetTable<CountryTable>().Insert(CityColumn{.value = "Tokyo"}, CountryColumn{.value = "Japan"});
-    db.GetTable<CountryTable>().Insert(CityColumn{.value = "Berlin"}, CountryColumn{.value = "Germany"});
+    db.GetTable<CountryTable>().Insert(CountryTable::MakeTableColumn<CityColumn>("Paris"), CountryTable::MakeTableColumn<CountryColumn>("France"));
+    db.GetTable<CountryTable>().Insert(CountryTable::MakeTableColumn<CityColumn>("Tokyo"), CountryTable::MakeTableColumn<CountryColumn>("Japan"));
+    db.GetTable<CountryTable>().Insert(CountryTable::MakeTableColumn<CityColumn>("Berlin"), CountryTable::MakeTableColumn<CountryColumn>("Germany"));
 
     using UName = UserTable::TableColumn<NameColumn>;
     using CName = CityTable::TableColumn<NameColumn>;
@@ -553,16 +553,16 @@ TEST_F(SQLiteHelperTest, MultiJoin_Left_Left_ThreeTables) {
     db.GetTable<CountryTable>().Delete().Execute();
 
     // users
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Alice"});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Bob"});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Charlie"});
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Bob"));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Charlie"));
 
     // cities (Charlie has no city)
-    db.GetTable<CityTable>().Insert(NameColumn{.value = "Alice"}, CityColumn{.value = "Paris"});
-    db.GetTable<CityTable>().Insert(NameColumn{.value = "Bob"}, CityColumn{.value = "Tokyo"});
+    db.GetTable<CityTable>().Insert(CityTable::MakeTableColumn<NameColumn>("Alice"), CityTable::MakeTableColumn<CityColumn>("Paris"));
+    db.GetTable<CityTable>().Insert(CityTable::MakeTableColumn<NameColumn>("Bob"), CityTable::MakeTableColumn<CityColumn>("Tokyo"));
 
     // countries (Tokyo has no country)
-    db.GetTable<CountryTable>().Insert(CityColumn{.value = "Paris"}, CountryColumn{.value = "France"});
+    db.GetTable<CountryTable>().Insert(CountryTable::MakeTableColumn<CityColumn>("Paris"), CountryTable::MakeTableColumn<CountryColumn>("France"));
 
     using UName = UserTable::TableColumn<NameColumn>;
     using CName = CityTable::TableColumn<NameColumn>;
@@ -596,16 +596,16 @@ TEST_F(SQLiteHelperTest, MultiJoin_Inner_Then_Left) {
     db.GetTable<CityTable>().Delete().Execute();
 
     // users
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Alice"});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Bob"});
-    db.GetTable<UserTable>().Insert(NameColumn{.value = "Eve"});
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Bob"));
+    db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Eve"));
 
     // departments (only Alice and Bob)
-    db.GetTable<DeptTable>().Insert(DeptColumn{.value = "HR"}, NameColumn{.value = "Alice"});
-    db.GetTable<DeptTable>().Insert(DeptColumn{.value = "IT"}, NameColumn{.value = "Bob"});
+    db.GetTable<DeptTable>().Insert(DeptTable::MakeTableColumn<DeptColumn>("HR"), DeptTable::MakeTableColumn<NameColumn>("Alice"));
+    db.GetTable<DeptTable>().Insert(DeptTable::MakeTableColumn<DeptColumn>("IT"), DeptTable::MakeTableColumn<NameColumn>("Bob"));
 
     // cities (only Alice)
-    db.GetTable<CityTable>().Insert(NameColumn{.value = "Alice"}, CityColumn{.value = "Paris"});
+    db.GetTable<CityTable>().Insert(CityTable::MakeTableColumn<NameColumn>("Alice"), CityTable::MakeTableColumn<CityColumn>("Paris"));
 
     using UName = UserTable::TableColumn<NameColumn>;
     using DName = DeptTable::TableColumn<NameColumn>;

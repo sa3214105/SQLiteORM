@@ -11,6 +11,55 @@
 #include <filesystem>
 
 namespace SQLiteHelper {
+    template<typename T, typename... Ts>
+    struct typeGroup {
+        using type = T;
+        using next = typeGroup<Ts...>;
+    };
+
+    // 終止版本：最後一個型別
+    template<typename T>
+    struct typeGroup<T> {
+        using type = T;
+        using next = void; // 結尾時沒有下一個
+    };
+
+    template<typename G1, typename G2>
+    struct ConcatTypeGroup;
+
+    template<typename... Ts1, typename... Ts2>
+    struct ConcatTypeGroup<typeGroup<Ts1...>, typeGroup<Ts2...> > {
+        using type = typeGroup<Ts1..., Ts2...>;
+    };
+
+    template<typename T, typename TG>
+    constexpr bool findTypeInTypeGroup() {
+        if constexpr (std::is_same_v<T, typename TG::type>) {
+            return true;
+        } else if constexpr (!std::is_void_v<typename TG::next>) {
+            return findTypeInTypeGroup<T, typename TG::next>();
+        } else {
+            return false;
+        }
+    }
+
+    template<typename TG1, typename TG2>
+    constexpr bool isTypeGroupSubset() {
+        if constexpr (std::is_void_v<typename TG1::type>) {
+            return true; // 空的 TG1 是任何 TG2 的子集
+        } else {
+            if constexpr (findTypeInTypeGroup<typename TG1::type, TG2>()) {
+                if constexpr (!std::is_void_v<typename TG1::next>) {
+                    return isTypeGroupSubset<typename TG1::next, TG2>();
+                } else {
+                    return true; // 已檢查完 TG1 的所有型別
+                }
+            } else {
+                return false; // 找不到 TG1 的型別於 TG2 中
+            }
+        }
+    }
+
     template<size_t N = 0>
     struct FixedString {
         char value[N];
@@ -168,11 +217,13 @@ namespace SQLiteHelper {
     }
 
     struct EmptyCond {
+        using Columns = void;
         constexpr static FixedString condition = " 1 ";
     };
 
     template<typename T1, typename T2, FixedString Opt>
     struct TwoValueCond {
+        using Columns = typeGroup<T1, T2>;
         constexpr static FixedString condition = " " + GetColumnName<T1>() + Opt + GetColumnName<T2>();
     };
 
@@ -225,47 +276,6 @@ namespace SQLiteHelper {
     struct OrCond {
         constexpr static FixedString condition = "(" + Cond1::condition + ") OR (" + Cond2::condition + ")";
     };
-
-    template<typename T, typename... Ts>
-    struct typeGroup {
-        using type = T;
-        using next = typeGroup<Ts...>;
-    };
-
-    // 終止版本：最後一個型別
-    template<typename T>
-    struct typeGroup<T> {
-        using type = T;
-        using next = void; // 結尾時沒有下一個
-    };
-
-    template<typename T, typename TG>
-    constexpr bool findTypeInTypeGroup() {
-        if constexpr (std::is_same_v<T, typename TG::type>) {
-            return true;
-        } else if constexpr (!std::is_void_v<typename TG::next>) {
-            return findTypeInTypeGroup<T, typename TG::next>();
-        } else {
-            return false;
-        }
-    }
-
-    template<typename TG1, typename TG2>
-    constexpr bool isTypeGroupSubset() {
-        if constexpr (std::is_void_v<typename TG1::type>) {
-            return true; // 空的 TG1 是任何 TG2 的子集
-        } else {
-            if constexpr (findTypeInTypeGroup<typename TG1::type, TG2>()) {
-                if constexpr (!std::is_void_v<typename TG1::next>) {
-                    return isTypeGroupSubset<typename TG1::next, TG2>();
-                } else {
-                    return true; // 已檢查完 TG1 的所有型別
-                }
-            } else {
-                return false; // 找不到 TG1 的型別於 TG2 中
-            }
-        }
-    }
 
     template<ColumnConcept T>
     std::string DefineColumnSQL() {
@@ -444,23 +454,34 @@ namespace SQLiteHelper {
         virtual ~Database_Base() = default;
     };
 
-    template<typename Table1, typename Table2, typename Condition>
-    class FullJoinTable;
-    template<typename Table1, typename Table2, typename Condition>
-    class InnerJoinTable;
-    template<typename Table1, typename Table2, typename Condition>
-    class LeftJoinTable;
-    template<typename Table1, typename Table2, typename Condition>
-    class RightJoinTable;
-    template<typename Table1, typename Table2, typename Condition>
-    class CrossJoinTable;
+    enum class JoinType {
+        FULL,
+        INNER,
+        LEFT,
+        RIGHT,
+        CROSS
+    };
 
-    template<FixedString from>
+    template<JoinType JT, typename Table1, typename Table2, typename Condition>
+    class JoinTable;
+    template<typename Table1, typename Table2, typename Condition>
+    using FullJoinTable = JoinTable<JoinType::FULL, Table1, Table2, Condition>;
+    template<typename Table1, typename Table2, typename Condition>
+    using InnerJoinTable = JoinTable<JoinType::INNER, Table1, Table2, Condition>;
+    template<typename Table1, typename Table2, typename Condition>
+    using LeftJoinTable = JoinTable<JoinType::LEFT, Table1, Table2, Condition>;
+    template<typename Table1, typename Table2, typename Condition>
+    using RightJoinTable = JoinTable<JoinType::RIGHT, Table1, Table2, Condition>;
+    template<typename Table1, typename Table2, typename Condition>
+    using CrossJoinTable = JoinTable<JoinType::CROSS, Table1, Table2, Condition>;
+
+    template<FixedString From, typename Columns>
     class QueryAble {
     public:
-        constexpr static FixedString name = from;
-    protected:
+        constexpr static FixedString name = From;
+        using columns = Columns;
 
+    protected:
         Database_Base &db;
 
         template<typename... ResultColumns>
@@ -500,7 +521,7 @@ namespace SQLiteHelper {
 
             auto Results() {
                 sqlite3_stmt *stmt = nullptr;
-                auto sql = _basic_sql + " FROM " + std::string(from) + _where_sql + ";";
+                auto sql = _basic_sql + " FROM " + std::string(From) + _where_sql + ";";
                 if (sqlite3_prepare_v2(_query_able.db._dbPtr.get(), sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
                     throw std::runtime_error(
                         std::string("Failed to prepare statement") + sqlite3_errmsg(_query_able.db._dbPtr.get()));
@@ -524,6 +545,8 @@ namespace SQLiteHelper {
 
         template<typename... ResultCol>
         auto Select() {
+            static_assert(isTypeGroupSubset<typeGroup<ResultCol...>, columns>(),
+                          "ResultCol must be subset of table columns");
             return SelectQuery<ResultCol...>(*this);
         }
 
@@ -553,74 +576,46 @@ namespace SQLiteHelper {
         }
     };
 
-    template<typename Table1, typename Table2, typename Condition>
-    class FullJoinTable : public QueryAble<Table1::name + FixedString(" FULL JOIN ") + Table2::name +
-                                           FixedString(" ON ") + Condition::condition> {
+    template<JoinType jt>
+    constexpr auto GetJoinTypeString() {
+        if constexpr (jt == JoinType::FULL) {
+            return FixedString(" FULL JOIN ");
+        } else if constexpr (jt == JoinType::INNER) {
+            return FixedString(" INNER JOIN ");
+        } else if constexpr (jt == JoinType::LEFT) {
+            return FixedString(" LEFT JOIN ");
+        } else if constexpr (jt == JoinType::RIGHT) {
+            return FixedString(" RIGHT JOIN ");
+        } else if constexpr (jt == JoinType::CROSS) {
+            return FixedString(" CROSS JOIN ");
+        }
+        throw std::runtime_error("Unsupported join type");
+    }
+
+
+    template<JoinType JT, typename Table1, typename Table2, typename Condition>
+    class JoinTable : public QueryAble<Table1::name + GetJoinTypeString<JT>() + Table2::name +
+                                       FixedString(" ON ") + Condition::condition, typename ConcatTypeGroup<typename
+                Table1::columns, typename Table2::columns>::type> {
     public:
-        constexpr static FixedString name = Table1::name + FixedString(" FULL JOIN ") + Table2::name +
+        constexpr static FixedString name = Table1::name + GetJoinTypeString<JT>() + Table2::name +
                                             FixedString(" ON ") + Condition::condition;
+        using columns = ConcatTypeGroup<typename Table1::columns, typename Table2::columns>::type;
 
-        explicit FullJoinTable(Database_Base &db) : QueryAble<Table1::name + FixedString(" FULL JOIN ") + Table2::name +
-                                                              FixedString(" ON ") + Condition::condition>(db) {
-        };
-    };
-
-    template<typename Table1, typename Table2, typename Condition>
-    class InnerJoinTable : public QueryAble<Table1::name + FixedString(" INNER JOIN ") + Table2::name +
-                                            FixedString(" ON ") + Condition::condition> {
-    public:
-        constexpr static FixedString name = Table1::name + FixedString(" INNER JOIN ") + Table2::name +
-                                            FixedString(" ON ") + Condition::condition;
-
-        explicit InnerJoinTable(Database_Base &db) : QueryAble<
-            Table1::name + FixedString(" INNER JOIN ") + Table2::name +
-            FixedString(" ON ") + Condition::condition>(db) {
-        };
-    };
-
-    template<typename Table1, typename Table2, typename Condition>
-    class LeftJoinTable : public QueryAble<Table1::name + FixedString(" LEFT JOIN ") + Table2::name +
-                                           FixedString(" ON ") + Condition::condition> {
-    public:
-        constexpr static FixedString name = Table1::name + FixedString(" LEFT JOIN ") + Table2::name +
-                                            FixedString(" ON ") + Condition::condition;
-
-        explicit LeftJoinTable(Database_Base &db) : QueryAble<Table1::name + FixedString(" LEFT JOIN ") + Table2::name +
-                                                              FixedString(" ON ") + Condition::condition>(db) {
-        };
-    };
-
-    template<typename Table1, typename Table2, typename Condition>
-    class RightJoinTable : public QueryAble<Table1::name + FixedString(" RIGHT JOIN ") + Table2::name +
-                                            FixedString(" ON ") + Condition::condition> {
-    public:
-        constexpr static FixedString name = Table1::name + FixedString(" RIGHT JOIN ") + Table2::name +
-                                            FixedString(" ON ") + Condition::condition;
-
-        explicit RightJoinTable(Database_Base &db) : QueryAble<
-            Table1::name + FixedString(" RIGHT JOIN ") + Table2::name +
-            FixedString(" ON ") + Condition::condition>(db) {
-        };
-    };
-
-    template<typename Table1, typename Table2, typename Condition>
-    class CrossJoinTable : public QueryAble<Table1::name + FixedString(" CROSS JOIN ") + Table2::name +
-                                            FixedString(" ON ") + Condition::condition> {
-    public:
-        constexpr static FixedString name = Table1::name + FixedString(" CROSS JOIN ") + Table2::name +
-                                            FixedString(" ON ") + Condition::condition;
-
-        explicit CrossJoinTable(Database_Base &db) : QueryAble<
-            Table1::name + FixedString(" CROSS JOIN ") + Table2::name +
-            FixedString(" ON ") + Condition::condition>(db) {
-        };
+        explicit JoinTable(Database_Base &db) : QueryAble<Table1::name + GetJoinTypeString<JT>() + Table2::name +
+                                                          FixedString(" ON ") + Condition::condition, typename
+            ConcatTypeGroup<typename
+                Table1::columns, typename Table2::columns>::type>(db) {
+        }
     };
 
     template<FixedString TableName, typename... Columns>
-    class Table : public QueryAble<TableName> {
+    class Table : public QueryAble<TableName, typeGroup<TableColumn<Table<TableName, Columns...>, Columns>...> > {
     public:
+        template<typename Col>
+        using TableColumn = TableColumn<Table, Col>;
         constexpr static FixedString name = TableName;
-        using columns = typeGroup<Columns...>;
+        using columns = typeGroup<TableColumn<Columns>...>;
 
     private:
         Database_Base &db;
@@ -701,7 +696,7 @@ namespace SQLiteHelper {
         };
 
     public:
-        explicit Table(Database_Base &db) : QueryAble<name>(db), db(db) {
+        explicit Table(Database_Base &db) : QueryAble<TableName, typeGroup<TableColumn<Columns>...> >(db), db(db) {
             std::string sql = std::string("CREATE TABLE IF NOT EXISTS ") + std::string(name) + " (";
             sql += GetColumnDefinitions<Columns...>();
             sql += ");";
@@ -740,15 +735,10 @@ namespace SQLiteHelper {
             return CrossJoinTable<Table, Table2, Condition>(this->db);
         }
 
-        template<typename... ResultCol>
-        auto Select() {
-            static_assert(isTypeGroupSubset<typeGroup<ResultCol...>, columns>);
-            return QueryAble<name>::template Select<ResultCol...>();
-        }
-
         template<typename... U>
         void Insert(U... values) {
-            static_assert(isTypeGroupSubset<typeGroup<U...>, columns>);
+            static_assert(isTypeGroupSubset<typeGroup<U...>, columns>(),
+                          "Insert values must be subset of table columns");
             std::string sql = std::string("INSERT INTO ") + std::string(name) + " (";
             sql += GetNames<U...>();
             sql += ") VALUES (";
@@ -778,6 +768,8 @@ namespace SQLiteHelper {
 
         template<typename... U>
         auto Update(U... values) {
+            static_assert(isTypeGroupSubset<typeGroup<U...>, columns>(),
+                          "Update values must be subset of table columns");
             return UpdateQuery(*this, std::forward<U>(values)...);
         }
 
@@ -785,8 +777,13 @@ namespace SQLiteHelper {
             return DeleteQuery(*this);
         }
 
-        template<typename Col>
-        using TableColumn = TableColumn<Table, Col>;
+        template<typename U>
+        static TableColumn<U> MakeTableColumn(const decltype(std::declval<U>().value) &v) {
+            auto ret =TableColumn<U>();
+            ret.value = v;
+            return ret;
+        }
+
     };
 
     template<typename... Table>
