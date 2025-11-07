@@ -64,7 +64,7 @@ namespace SQLiteHelper {
     struct FixedString {
         char value[N];
 
-        constexpr FixedString(const char (&str)[N]) {
+        constexpr FixedString(const char (&str)[N]): value{} {
             for (size_t i = 0; i < N; ++i)
                 value[i] = str[i];
         }
@@ -103,7 +103,7 @@ namespace SQLiteHelper {
         if constexpr (num < 0) {
             constexpr char arr[2] = {'0' + (num * -1 % 10), '\0'};
             if constexpr (num <= -10) {
-                return "-" + toFixedString<num / 10 * -1>() + FixedString(arr);
+                return "-" + toFixedString<-(num / 10)>() + FixedString(arr);
             } else {
                 return "-" + FixedString(arr);
             }
@@ -162,10 +162,6 @@ namespace SQLiteHelper {
         }
 
         constexpr FixedType(const T (&str)[N]) : value(str) {
-        }
-
-        constexpr operator SaveType &() const {
-            return value;
         }
     };
 
@@ -351,7 +347,8 @@ namespace SQLiteHelper {
         auto datatype = sqlite3_column_type(stmt, colIndex);
         if constexpr (T::type == column_type::TEXT) {
             if (datatype != SQLITE_TEXT) {
-                if constexpr (std::is_convertible_v<nullptr_t, T>) {
+                // c++ 23 std::is_convertible_v<nullptr_t,std::string>會判定為 true，因此需要額外排除
+                if constexpr (!std::is_same_v<decltype(std::declval<T>().value), std::string> && std::is_convertible_v<nullptr_t, decltype(std::declval<T>().value)>) {
                     t.value = nullptr;
                 }
             } else {
@@ -359,7 +356,7 @@ namespace SQLiteHelper {
             }
         } else if constexpr (T::type == column_type::NUMERIC) {
             if (datatype != SQLITE_INTEGER) {
-                if constexpr (std::is_convertible_v<nullptr_t, T>) {
+                if constexpr (std::is_convertible_v<nullptr_t, decltype(std::declval<T>().value)>) {
                     t.value = nullptr;
                 }
             } else {
@@ -367,7 +364,7 @@ namespace SQLiteHelper {
             }
         } else if constexpr (T::type == column_type::INTEGER) {
             if (datatype != SQLITE_INTEGER) {
-                if constexpr (std::is_convertible_v<nullptr_t, T>) {
+                if constexpr (std::is_convertible_v<nullptr_t, decltype(std::declval<T>().value)>) {
                     t.value = nullptr;
                 }
             } else {
@@ -375,7 +372,7 @@ namespace SQLiteHelper {
             }
         } else if constexpr (T::type == column_type::REAL) {
             if (datatype != SQLITE_FLOAT) {
-                if constexpr (std::is_convertible_v<nullptr_t, T>) {
+                if constexpr (std::is_convertible_v<nullptr_t, decltype(std::declval<T>().value)>) {
                     t.value = nullptr;
                 }
             } else {
@@ -383,7 +380,7 @@ namespace SQLiteHelper {
             }
         } else if constexpr (T::type == column_type::BLOB) {
             if (datatype != SQLITE_BLOB) {
-                if constexpr (std::is_convertible_v<nullptr_t, T>) {
+                if constexpr (std::is_convertible_v<nullptr_t, decltype(std::declval<T>().value)>) {
                     t.value = nullptr;
                 }
             } else {
@@ -433,16 +430,19 @@ namespace SQLiteHelper {
         std::string _db_path;
         std::unique_ptr<sqlite3, decltype(&sqlite3_close)> _dbPtr = {nullptr, sqlite3_close};
 
-        Database_Base(const std::string &dbPath) : _db_path(dbPath) {
-            // Delete existing DB file if present to ensure a clean database on open
-            std::error_code ec;
-            if (std::filesystem::exists(_db_path, ec)) {
-                std::filesystem::remove(_db_path, ec);
+        Database_Base(const std::string &dbPath, bool removeExisting = false) : _db_path(dbPath) {
+            // Optionally delete existing DB file if requested (useful for tests)
+            if (removeExisting) {
+                std::error_code ec;
+                if (std::filesystem::exists(_db_path, ec)) {
+                    std::filesystem::remove(_db_path, ec);
+                }
             }
             sqlite3 *pDb = nullptr;
             int rc = sqlite3_open_v2(_db_path.c_str(), &pDb, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr);
             if (rc != SQLITE_OK) {
-                throw std::runtime_error("Can't open database: " + std::string(sqlite3_errmsg(pDb)));
+                std::string errMsg = pDb ? sqlite3_errmsg(pDb) : "Unknown error";
+                throw std::runtime_error("Can't open database: " + errMsg + "\nPath: " + _db_path);
             }
             _dbPtr = {pDb, sqlite3_close};
         }
@@ -520,7 +520,8 @@ namespace SQLiteHelper {
                 auto sql = _basic_sql + " FROM " + std::string(From) + _where_sql + ";";
                 if (sqlite3_prepare_v2(_query_able.db._dbPtr.get(), sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
                     throw std::runtime_error(
-                        std::string("Failed to prepare statement") + sqlite3_errmsg(_query_able.db._dbPtr.get()));
+                        "Failed to prepare statement: " + std::string(sqlite3_errmsg(_query_able.db._dbPtr.get())) +
+                        "\nSQL: " + sql);
                 }
                 std::vector<std::tuple<ResultColumns...> > ret;
                 while (sqlite3_step(stmt) == SQLITE_ROW) {
@@ -639,7 +640,9 @@ namespace SQLiteHelper {
                 sqlite3_stmt *stmt = nullptr;
                 auto sql = _basic_sql + _where_sql + ";";
                 if (sqlite3_prepare_v2(_table.db._dbPtr.get(), sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-                    throw std::runtime_error("Failed to prepare statement");
+                    throw std::runtime_error(
+                        "Failed to prepare UPDATE statement: " + std::string(sqlite3_errmsg(_table.db._dbPtr.get())) +
+                        "\nSQL: " + sql);
                 }
 
                 int index = 1;
@@ -650,7 +653,9 @@ namespace SQLiteHelper {
                 if (sqlite3_step(stmt) != SQLITE_DONE) {
                     auto errMsg = sqlite3_errmsg(_table.db._dbPtr.get());
                     sqlite3_finalize(stmt);
-                    throw std::runtime_error("Failed to execute update statement: " + std::string(errMsg));
+                    throw std::runtime_error(
+                        "Failed to execute UPDATE statement: " + std::string(errMsg) +
+                        "\nSQL: " + sql);
                 }
                 if (sqlite3_finalize(stmt) != SQLITE_OK) {
                     throw std::runtime_error("Failed to finalize statement");
@@ -678,12 +683,16 @@ namespace SQLiteHelper {
                 sqlite3_stmt *stmt = nullptr;
                 auto sql = _basic_sql + _where_sql + ";";
                 if (sqlite3_prepare_v2(_table.db._dbPtr.get(), sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-                    throw std::runtime_error("Failed to prepare statement");
+                    throw std::runtime_error(
+                        "Failed to prepare DELETE statement: " + std::string(sqlite3_errmsg(_table.db._dbPtr.get())) +
+                        "\nSQL: " + sql);
                 }
                 if (sqlite3_step(stmt) != SQLITE_DONE) {
                     auto errMsg = sqlite3_errmsg(_table.db._dbPtr.get());
                     sqlite3_finalize(stmt);
-                    throw std::runtime_error("Failed to execute delete statement: " + std::string(errMsg));
+                    throw std::runtime_error(
+                        "Failed to execute DELETE statement: " + std::string(errMsg) +
+                        "\nSQL: " + sql);
                 }
                 if (sqlite3_finalize(stmt) != SQLITE_OK) {
                     throw std::runtime_error("Failed to finalize statement");
@@ -749,15 +758,20 @@ namespace SQLiteHelper {
 
             sqlite3_stmt *stmt = nullptr;
             if (sqlite3_prepare_v2(db._dbPtr.get(), sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-                throw std::runtime_error("Failed to prepare insert statement");
+                throw std::runtime_error(
+                    "Failed to prepare INSERT statement: " + std::string(sqlite3_errmsg(db._dbPtr.get())) +
+                    "\nSQL: " + sql);
             }
 
             int index = 1;
             ((bindValue(stmt, index++, values)), ...);
 
             if (sqlite3_step(stmt) != SQLITE_DONE) {
+                auto errMsg = sqlite3_errmsg(db._dbPtr.get());
                 sqlite3_finalize(stmt);
-                throw std::runtime_error("Failed to execute insert statement");
+                throw std::runtime_error(
+                    "Failed to execute INSERT statement: " + std::string(errMsg) +
+                    "\nSQL: " + sql);
             }
             sqlite3_finalize(stmt);
         }
@@ -791,8 +805,9 @@ namespace SQLiteHelper {
         private:
             Database &_db;
             bool _isCommittedOrRolledBack = false;
+            int _exceptionCount;
 
-            Transaction(Database &db) : _db(db) {
+            explicit Transaction(Database &db) : _db(db), _exceptionCount(std::uncaught_exceptions()) {
                 char *errMsg = nullptr;
                 int rc = sqlite3_exec(_db._dbPtr.get(), "BEGIN TRANSACTION;", nullptr, nullptr, &errMsg);
                 if (rc != SQLITE_OK) {
@@ -802,26 +817,44 @@ namespace SQLiteHelper {
             }
 
         public:
-            ~Transaction() {
+            ~Transaction() noexcept(false) {
                 if (_isCommittedOrRolledBack) {
                     return;
                 }
-                if (sqlite3_errcode(_db._dbPtr.get()) != SQLITE_OK) {
-                    Rollback();
+                // 檢查是否有新的例外發生（包括 C++ 例外或 SQLite 錯誤）
+                bool hasException = (std::uncaught_exceptions() > _exceptionCount) ||
+                                   (sqlite3_errcode(_db._dbPtr.get()) != SQLITE_OK);
+
+                if (hasException) {
+                    // 有例外發生，執行 Rollback（不拋出例外）
+                    try {
+                        Rollback();
+                    } catch (...) {
+                        // 解構子中不應拋出例外，忽略 Rollback 錯誤
+                    }
+                } else {
+                    // 正常情況，執行 Commit
+                    // 若在正常情況下 Commit 失敗，應該拋出例外通知使用者
+                    Commit();
                 }
-                Commit();
             }
 
             void Rollback() {
+                if (_isCommittedOrRolledBack) {
+                    throw std::runtime_error("Multiple commit/rollback calls on the same transaction");
+                }
                 _isCommittedOrRolledBack = true;
                 char *errMsg = nullptr;
                 if (sqlite3_exec(_db._dbPtr.get(), "ROLLBACK;", nullptr, nullptr, &errMsg) != SQLITE_OK) {
                     std::string msg = errMsg ? errMsg : "Unknown error";
-                    throw std::runtime_error("Failed to commit transaction: " + msg);
+                    throw std::runtime_error("Failed to rollback transaction: " + msg);
                 }
             }
 
             void Commit() {
+                if (_isCommittedOrRolledBack) {
+                    throw std::runtime_error("Multiple commit/rollback calls on the same transaction");
+                }
                 _isCommittedOrRolledBack = true;
                 char *errMsg = nullptr;
                 if (sqlite3_exec(_db._dbPtr.get(), "COMMIT;", nullptr, nullptr, &errMsg) != SQLITE_OK) {
@@ -834,24 +867,10 @@ namespace SQLiteHelper {
     private:
         std::tuple<Table...> _tables;
 
-        sqlite3 *openSQlite(bool removeExisting = true) {
-            if (removeExisting) {
-                std::error_code ec; // non-throwing removal
-                if (std::filesystem::exists(_db_path, ec)) {
-                    std::filesystem::remove(_db_path, ec);
-                }
-            }
-            sqlite3 *pDb = nullptr;
-            int rc = sqlite3_open_v2(_db_path.c_str(), &pDb, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr);
-            if (rc != SQLITE_OK) {
-                throw std::runtime_error("Can't open database: " + std::string(sqlite3_errmsg(pDb)));
-            }
-            return pDb;
-        }
-
     public:
-        explicit Database(const std::string &db_path) : Database_Base(db_path),
-                                                        _tables(Table(*this)...) {
+        explicit Database(const std::string &db_path, bool removeExisting = false)
+            : Database_Base(db_path, removeExisting),
+              _tables(Table(*this)...) {
         }
 
         template<typename T>
@@ -861,22 +880,14 @@ namespace SQLiteHelper {
 
         void CreateTransaction(const std::function<void(Transaction &)> &callback) {
             Transaction transaction(*this);
-            try {
-                callback(transaction);
-                transaction.Commit();
-            } catch (std::exception &e) {
-                transaction.Rollback();
-            }
+            callback(transaction);
+            // 解構子會自動根據錯誤狀態決定 Commit 或 Rollback
         }
 
         void CreateTransaction(const std::function<void()> &callback) {
             Transaction transaction(*this);
-            try {
-                callback();
-                transaction.Commit();
-            } catch (std::exception &e) {
-                transaction.Rollback();
-            }
+            callback();
+            // 解構子會自動根據錯誤狀態決定 Commit 或 Rollback
         }
     };
 }

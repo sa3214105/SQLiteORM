@@ -55,7 +55,7 @@ class SQLiteHelperTest : public ::testing::Test {
 protected:
     void SetUp() override {
         // 測試開始前清理數據庫
-        SQLiteHelper::Database<UserTable> db("test_database.db");
+        SQLiteHelper::Database<UserTable> db("test_database.db", true);
         db.GetTable<UserTable>().Delete().Execute();
     }
 
@@ -66,7 +66,7 @@ protected:
 
 // ============ Insert 測試 ============
 TEST_F(SQLiteHelperTest, InsertSingleColumn) {
-    SQLiteHelper::Database<UserTable> db("test_database.db");
+    SQLiteHelper::Database<UserTable> db("test_database.db", true);
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"));
     auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>>().Results();
     EXPECT_EQ(results.size(), 1);
@@ -74,7 +74,7 @@ TEST_F(SQLiteHelperTest, InsertSingleColumn) {
 }
 
 TEST_F(SQLiteHelperTest, InsertMultipleColumns) {
-    SQLiteHelper::Database<UserTable> db("test_database.db");
+    SQLiteHelper::Database<UserTable> db("test_database.db", true);
     db.GetTable<UserTable>().Insert(
         UserTable::MakeTableColumn<NameColumn>("Bob"),
         UserTable::MakeTableColumn<AgeColumn>(30),
@@ -88,7 +88,7 @@ TEST_F(SQLiteHelperTest, InsertMultipleColumns) {
 }
 
 TEST_F(SQLiteHelperTest, InsertMultipleRows) {
-    SQLiteHelper::Database<UserTable> db("test_database.db");
+    SQLiteHelper::Database<UserTable> db("test_database.db", true);
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"));
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Bob"));
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Charlie"));
@@ -99,7 +99,7 @@ TEST_F(SQLiteHelperTest, InsertMultipleRows) {
 
 // ============ Select 測試 ============
 TEST_F(SQLiteHelperTest, SelectAllRows) {
-    SQLiteHelper::Database<UserTable> db("test_database.db");
+    SQLiteHelper::Database<UserTable> db("test_database.db", true);
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>( "User1"), UserTable::MakeTableColumn<AgeColumn>(20));
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>( "User2"), UserTable::MakeTableColumn<AgeColumn>(25));
 
@@ -108,7 +108,7 @@ TEST_F(SQLiteHelperTest, SelectAllRows) {
 }
 
 TEST_F(SQLiteHelperTest, SelectSingleColumn) {
-    SQLiteHelper::Database<UserTable> db("test_database.db");
+    SQLiteHelper::Database<UserTable> db("test_database.db", true);
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Test"), UserTable::MakeTableColumn<AgeColumn>(25));
 
     auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>>().Results();
@@ -118,7 +118,7 @@ TEST_F(SQLiteHelperTest, SelectSingleColumn) {
 
 // ============ Where 條件測試 ============
 TEST_F(SQLiteHelperTest, WhereEqual) {
-    SQLiteHelper::Database<UserTable> db("test_database.db");
+    SQLiteHelper::Database<UserTable> db("test_database.db", true);
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"));
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Bob"));
 
@@ -129,7 +129,7 @@ TEST_F(SQLiteHelperTest, WhereEqual) {
 }
 
 TEST_F(SQLiteHelperTest, WhereNotEqual) {
-    SQLiteHelper::Database<UserTable> db("test_database.db");
+    SQLiteHelper::Database<UserTable> db("test_database.db", true);
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"));
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Bob"));
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Charlie"));
@@ -140,7 +140,7 @@ TEST_F(SQLiteHelperTest, WhereNotEqual) {
 }
 
 TEST_F(SQLiteHelperTest, WhereGreaterThan) {
-    SQLiteHelper::Database<UserTable> db("test_database.db");
+    SQLiteHelper::Database<UserTable> db("test_database.db", true);
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(20));
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(25));
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(30));
@@ -152,7 +152,7 @@ TEST_F(SQLiteHelperTest, WhereGreaterThan) {
 }
 
 TEST_F(SQLiteHelperTest, WhereLessThan) {
-    SQLiteHelper::Database<UserTable> db("test_database.db");
+    SQLiteHelper::Database<UserTable> db("test_database.db", true);
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(20));
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(25));
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(30));
@@ -164,7 +164,7 @@ TEST_F(SQLiteHelperTest, WhereLessThan) {
 }
 
 TEST_F(SQLiteHelperTest, WhereGreaterThanEqual) {
-    SQLiteHelper::Database<UserTable> db("test_database.db");
+    SQLiteHelper::Database<UserTable> db("test_database.db", true);
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(20));
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(25));
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(30));
@@ -175,7 +175,7 @@ TEST_F(SQLiteHelperTest, WhereGreaterThanEqual) {
 }
 
 TEST_F(SQLiteHelperTest, WhereLessThanEqual) {
-    SQLiteHelper::Database<UserTable> db("test_database.db");
+    SQLiteHelper::Database<UserTable> db("test_database.db", true);
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(20));
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(25));
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(30));
@@ -187,7 +187,7 @@ TEST_F(SQLiteHelperTest, WhereLessThanEqual) {
 
 // ============ 邏輯運算符測試 (AND / OR) ============
 TEST_F(SQLiteHelperTest, WhereAND) {
-    SQLiteHelper::Database<UserTable> db("test_database.db");
+    SQLiteHelper::Database<UserTable> db("test_database.db", true);
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"), UserTable::MakeTableColumn<AgeColumn>(25));
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Bob"), UserTable::MakeTableColumn<AgeColumn>(30));
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"), UserTable::MakeTableColumn<AgeColumn>(35));
@@ -203,7 +203,7 @@ TEST_F(SQLiteHelperTest, WhereAND) {
 }
 
 TEST_F(SQLiteHelperTest, WhereOR) {
-    SQLiteHelper::Database<UserTable> db("test_database.db");
+    SQLiteHelper::Database<UserTable> db("test_database.db", true);
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"), UserTable::MakeTableColumn<AgeColumn>(25));
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Bob"), UserTable::MakeTableColumn<AgeColumn>(30));
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Charlie"), UserTable::MakeTableColumn<AgeColumn>(35));
@@ -219,7 +219,7 @@ TEST_F(SQLiteHelperTest, WhereOR) {
 
 // ============ Update 測試 ============
 TEST_F(SQLiteHelperTest, UpdateSingleColumn) {
-    SQLiteHelper::Database<UserTable> db("test_database.db");
+    SQLiteHelper::Database<UserTable> db("test_database.db", true);
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("OldName"));
 
     db.GetTable<UserTable>().Update(UserTable::MakeTableColumn<NameColumn>("NewName"))
@@ -230,7 +230,7 @@ TEST_F(SQLiteHelperTest, UpdateSingleColumn) {
 }
 
 TEST_F(SQLiteHelperTest, UpdateMultipleColumns) {
-    SQLiteHelper::Database<UserTable> db("test_database.db");
+    SQLiteHelper::Database<UserTable> db("test_database.db", true);
     db.GetTable<UserTable>().Insert(
         UserTable::MakeTableColumn<NameColumn>("Alice"),
         UserTable::MakeTableColumn<AgeColumn>(20)
@@ -247,7 +247,7 @@ TEST_F(SQLiteHelperTest, UpdateMultipleColumns) {
 }
 
 TEST_F(SQLiteHelperTest, UpdateMultipleRows) {
-    SQLiteHelper::Database<UserTable> db("test_database.db");
+    SQLiteHelper::Database<UserTable> db("test_database.db", true);
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"), UserTable::MakeTableColumn<AgeColumn>(25));
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Bob"), UserTable::MakeTableColumn<AgeColumn>(25));
 
@@ -262,7 +262,7 @@ TEST_F(SQLiteHelperTest, UpdateMultipleRows) {
 
 // ============ Delete 測試 ============
 TEST_F(SQLiteHelperTest, DeleteSingleRow) {
-    SQLiteHelper::Database<UserTable> db("test_database.db");
+    SQLiteHelper::Database<UserTable> db("test_database.db", true);
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"));
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Bob"));
 
@@ -275,7 +275,7 @@ TEST_F(SQLiteHelperTest, DeleteSingleRow) {
 }
 
 TEST_F(SQLiteHelperTest, DeleteMultipleRows) {
-    SQLiteHelper::Database<UserTable> db("test_database.db");
+    SQLiteHelper::Database<UserTable> db("test_database.db", true);
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(20));
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(20));
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(30));
@@ -288,7 +288,7 @@ TEST_F(SQLiteHelperTest, DeleteMultipleRows) {
 }
 
 TEST_F(SQLiteHelperTest, DeleteAllRows) {
-    SQLiteHelper::Database<UserTable> db("test_database.db");
+    SQLiteHelper::Database<UserTable> db("test_database.db", true);
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Alice"));
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("Bob"));
 
@@ -343,10 +343,10 @@ TEST_F(SQLiteHelperTest, TransactionCommit) {
 
 TEST_F(SQLiteHelperTest, TransactionRollback) {
     SQLiteHelper::Database<UserTable> db("test_database.db");
-    db.CreateTransaction([&db](auto &transation ) {
+    EXPECT_ANY_THROW( db.CreateTransaction([&db](auto &transation ) {
         db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("TxRollback"), UserTable::MakeTableColumn<AgeColumn>(88));
         throw std::runtime_error("Force rollback");
-    });
+    }));
     auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>, UserTable::TableColumn<AgeColumn>>()
             .Where<SQLiteHelper::EqualValueCond<NameColumn, "TxRollback">>().Results();
     EXPECT_EQ(results.size(), 0);
