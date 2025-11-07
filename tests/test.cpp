@@ -158,7 +158,7 @@ TEST_F(SQLiteHelperTest, WhereLessThan) {
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(30));
 
     auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<AgeColumn>>()
-            .Where<SQLiteHelper::LessThanValueCond<AgeColumn, "25">>().Results();
+            .Where<SQLiteHelper::LessThanValueCond<AgeColumn, 25>>().Results();
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<UserTable::TableColumn<AgeColumn>>(results[0]).value, 20);
 }
@@ -170,7 +170,7 @@ TEST_F(SQLiteHelperTest, WhereGreaterThanEqual) {
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(30));
 
     auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<AgeColumn>>()
-            .Where<SQLiteHelper::GreaterThanEqualValueCond<AgeColumn, "25">>().Results();
+            .Where<SQLiteHelper::GreaterThanEqualValueCond<AgeColumn, 25>>().Results();
     EXPECT_EQ(results.size(), 2);
 }
 
@@ -181,7 +181,7 @@ TEST_F(SQLiteHelperTest, WhereLessThanEqual) {
     db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<AgeColumn>(30));
 
     auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<AgeColumn>>()
-            .Where<SQLiteHelper::LessThanEqualValueCond<AgeColumn, "25">>().Results();
+            .Where<SQLiteHelper::LessThanEqualValueCond<AgeColumn, 25>>().Results();
     EXPECT_EQ(results.size(), 2);
 }
 
@@ -194,7 +194,7 @@ TEST_F(SQLiteHelperTest, WhereAND) {
 
     using Cond = SQLiteHelper::AndCond<
         SQLiteHelper::EqualValueCond<NameColumn, "Alice">,
-        SQLiteHelper::GreaterThanValueCond<AgeColumn, "25">
+        SQLiteHelper::GreaterThanValueCond<AgeColumn, 25>
     >;
     auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>, UserTable::TableColumn<AgeColumn>>()
             .Where<Cond>().Results();
@@ -309,7 +309,7 @@ TEST_F(SQLiteHelperTest, ComplexOperations) {
 
     // 查詢年齡 > 25 的用戶
     auto results1 = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>, UserTable::TableColumn<AgeColumn>>()
-            .Where<SQLiteHelper::GreaterThanValueCond<AgeColumn, "25">>().Results();
+            .Where<SQLiteHelper::GreaterThanValueCond<AgeColumn, 25>>().Results();
     EXPECT_EQ(results1.size(), 2);
 
     // 更新 Bob 的分數
@@ -323,7 +323,7 @@ TEST_F(SQLiteHelperTest, ComplexOperations) {
 
     // 刪除年齡 >= 30 的用戶
     db.GetTable<UserTable>().Delete()
-            .Where<SQLiteHelper::GreaterThanEqualValueCond<AgeColumn, "30">>().Execute();
+            .Where<SQLiteHelper::GreaterThanEqualValueCond<AgeColumn, 30>>().Execute();
 
     auto results3 = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>>().Results();
     EXPECT_EQ(results3.size(), 2);

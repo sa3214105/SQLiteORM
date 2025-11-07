@@ -72,16 +72,36 @@ namespace SQLiteHelper {
         constexpr operator std::string_view() const {
             return {value, N - 1};
         }
-
-        operator std::string() const {
-            return std::string{value, N - 1};
-        }
     };
+
+    template<std::size_t N1, std::size_t N2>
+    constexpr auto operator+(const FixedString<N1> &a, const FixedString<N2> &b) {
+        char result[N1 + N2 - 1]{};
+        std::copy_n(a.value, N1 - 1, result);
+        std::copy_n(b.value, N2, result + N1 - 1);
+        return FixedString<N1 + N2 - 1>(result);
+    }
+
+    template<std::size_t N1, std::size_t N2>
+    constexpr auto operator+(const FixedString<N1> &a, const char (&b)[N2]) {
+        char result[N1 + N2 - 1]{};
+        std::copy_n(a.value, N1 - 1, result);
+        std::copy_n(b, N2, result + N1 - 1);
+        return FixedString<N1 + N2 - 1>(result);
+    }
+
+    template<std::size_t N1, std::size_t N2>
+    constexpr auto operator+(const char (&a)[N1], const FixedString<N2> &b) {
+        char result[N1 + N2 - 1]{};
+        std::copy_n(a, N1 - 1, result);
+        std::copy_n(b.value, N2, result + N1 - 1);
+        return FixedString<N1 + N2 - 1>(result);
+    }
 
     template<int num>
     constexpr auto toFixedString() {
         if constexpr (num < 0) {
-            char arr[2] = {'0' + (num * -1 % 10), '\0'};
+            constexpr char arr[2] = {'0' + (num * -1 % 10), '\0'};
             if constexpr (num <= -10) {
                 return "-" + toFixedString<num / 10 * -1>() + FixedString(arr);
             } else {
@@ -149,30 +169,6 @@ namespace SQLiteHelper {
         }
     };
 
-    template<std::size_t N1, std::size_t N2>
-    constexpr auto operator+(const FixedString<N1> &a, const FixedString<N2> &b) {
-        char result[N1 + N2 - 1]{};
-        std::copy_n(a.value, N1 - 1, result);
-        std::copy_n(b.value, N2, result + N1 - 1);
-        return FixedString<N1 + N2 - 1>(result);
-    }
-
-    template<std::size_t N1, std::size_t N2>
-    constexpr auto operator+(const FixedString<N1> &a, const char (&b)[N2]) {
-        char result[N1 + N2 - 1]{};
-        std::copy_n(a.value, N1 - 1, result);
-        std::copy_n(b, N2, result + N1 - 1);
-        return FixedString<N1 + N2 - 1>(result);
-    }
-
-    template<std::size_t N1, std::size_t N2>
-    constexpr auto operator+(const char (&a)[N1], const FixedString<N2> &b) {
-        char result[N1 + N2 - 1]{};
-        std::copy_n(a, N1 - 1, result);
-        std::copy_n(b.value, N2, result + N1 - 1);
-        return FixedString<N1 + N2 - 1>(result);
-    }
-
     enum class column_type {
         TEXT,
         NUMERIC,
@@ -197,7 +193,7 @@ namespace SQLiteHelper {
     };
 
     template<typename T, ColumnConcept U>
-    struct TableColumn : U {
+    struct TableColumn_Base : U {
         using TableType = T;
     };
 
@@ -258,13 +254,13 @@ namespace SQLiteHelper {
     using EqualValueCond = OneValueCond<T1, T2, FixedString(" = ")>;
     template<typename T1, FixedType T2>
     using NotEqualValueCond = OneValueCond<T1, T2, FixedString(" != ")>;
-    template<typename T, FixedType V2> /*requires std::is_integral_v<typename decltype(V2)::SaveType>*/
+    template<typename T, FixedType V2> requires std::is_integral_v<typename decltype(V2)::SaveType>
     using GreaterThanValueCond = OneValueCond<T, V2, FixedString(" > ")>;
-    template<typename T, FixedType V2> /*requires std::is_integral_v<typename decltype(V2)::SaveType>*/
+    template<typename T, FixedType V2> requires std::is_integral_v<typename decltype(V2)::SaveType>
     using GreaterThanEqualValueCond = OneValueCond<T, V2, FixedString(" >= ")>;
-    template<typename T, FixedType V2> /*requires std::is_integral_v<typename decltype(V2)::SaveType>*/
+    template<typename T, FixedType V2> requires std::is_integral_v<typename decltype(V2)::SaveType>
     using LessThanValueCond = OneValueCond<T, V2, FixedString(" < ")>;
-    template<typename T, FixedType V2> /*requires std::is_integral_v<typename decltype(V2)::SaveType>*/
+    template<typename T, FixedType V2> requires std::is_integral_v<typename decltype(V2)::SaveType>
     using LessThanEqualValueCond = OneValueCond<T, V2, FixedString(" <= ")>;
 
     template<typename Cond1, typename Cond2>
@@ -367,7 +363,7 @@ namespace SQLiteHelper {
                     t.value = nullptr;
                 }
             } else {
-                t.value = sqlite3_column_type(stmt, colIndex);
+                t.value = sqlite3_column_double(stmt, colIndex);
             }
         } else if constexpr (T::type == column_type::INTEGER) {
             if (datatype != SQLITE_INTEGER) {
@@ -610,10 +606,10 @@ namespace SQLiteHelper {
     };
 
     template<FixedString TableName, typename... Columns>
-    class Table : public QueryAble<TableName, typeGroup<TableColumn<Table<TableName, Columns...>, Columns>...> > {
+    class Table : public QueryAble<TableName, typeGroup<TableColumn_Base<Table<TableName, Columns...>, Columns>...> > {
     public:
         template<typename Col>
-        using TableColumn = TableColumn<Table, Col>;
+        using TableColumn = TableColumn_Base<Table, Col>;
         constexpr static FixedString name = TableName;
         using columns = typeGroup<TableColumn<Columns>...>;
 
