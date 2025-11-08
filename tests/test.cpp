@@ -55,8 +55,6 @@ class SQLiteHelperTest : public ::testing::Test {
 protected:
     void SetUp() override {
         // 測試開始前清理數據庫
-        SQLiteHelper::Database<UserTable> db("test_database.db", true);
-        db.GetTable<UserTable>().Delete().Execute();
     }
 
     void TearDown() override {
