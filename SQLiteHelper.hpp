@@ -8,8 +8,8 @@
 #include <type_traits>
 #include <string_view>
 #include <stdexcept>
-#include <utility>
 #include <filesystem>
+#include <functional>
 
 namespace SQLiteHelper {
     template<typename T, typename... Ts>
@@ -97,6 +97,16 @@ namespace SQLiteHelper {
         std::copy_n(a, N1 - 1, result);
         std::copy_n(b.value, N2, result + N1 - 1);
         return FixedString<N1 + N2 - 1>(result);
+    }
+
+    template<std::size_t N>
+    std::string operator+(const FixedString<N> &a, const std::string &b) {
+        return std::string(a.value) + b;
+    }
+
+    template<std::size_t N>
+    std::string operator+(const std::string &a, const FixedString<N> &b) {
+        return a + std::string(b.value);
     }
 
     template<int num>
@@ -209,66 +219,151 @@ namespace SQLiteHelper {
         }
     }
 
-    struct EmptyCond {
-        using Columns = void;
-        constexpr static FixedString condition = " 1 ";
+    template<typename ColumnGroup, typename... Parameters>
+    struct Condition {
+        using Columns = ColumnGroup;
+        std::string condition;
+        std::tuple<Parameters...> params;
+
+        template<typename ColumnOther, typename... ParametersOther>
+        auto operator&&(const Condition<ColumnOther, ParametersOther...> &other) const {
+            return Condition<typename ConcatTypeGroup<ColumnGroup, ColumnOther>::type, Parameters..., ParametersOther
+                ...>{
+                .condition = "(" + condition + ") AND (" + other.condition + ")",
+                .params = std::tuple_cat(params, other.params)
+            };
+        }
+
+        template<typename ColumnOther, typename... ParametersOther>
+        auto operator||(const Condition<ColumnOther, ParametersOther...> &other) const {
+            return Condition<typename ConcatTypeGroup<ColumnGroup, ColumnOther>::type, Parameters..., ParametersOther
+                ...>{
+                .condition = "(" + condition + ") OR (" + other.condition + ")",
+                .params = std::tuple_cat(params, other.params)
+            };
+        }
     };
 
-    template<typename T1, typename T2, FixedString Opt>
-    struct TwoValueCond {
-        using Columns = typeGroup<T1, T2>;
-        constexpr static FixedString condition = " " + GetColumnName<T1>() + Opt + GetColumnName<T2>();
-    };
+    template<typename T>
+    concept IsSQLNum = std::is_integral_v<T> || std::is_floating_point_v<T>;
 
-    template<typename T1, typename T2>
-    using EqualCond = TwoValueCond<T1, T2, FixedString(" = ")>;
-    template<typename T1, typename T2>
-    using NotEqualCond = TwoValueCond<T1, T2, FixedString(" != ")>;
-    template<typename T1, typename T2>
-    using GreaterThanCond = TwoValueCond<T1, T2, FixedString(" > ")>;
-    template<typename T1, typename T2>
-    using GreaterThanEqualCond = TwoValueCond<T1, T2, FixedString(" >= ")>;
-    template<typename T1, typename T2>
-    using LessThanCond = TwoValueCond<T1, T2, FixedString(" < ")>;
-    template<typename T1, typename T2>
-    using LessThanEqualCond = TwoValueCond<T1, T2, FixedString(" <= ")>;
+    template<typename T>
+    concept IsSQLLiteral = IsSQLNum<T> || std::is_same_v<T, std::string> || std::is_same_v<T, const char *>;
 
-    template<typename T1, FixedType V2, FixedString Opt>
-    struct OneValueCond;
+    template<FixedString Opt, IsTableColumn Col1, IsTableColumn Col2>
+    auto MakeCondition() {
+        return Condition<typeGroup<Col1, Col2> >{
+            .condition = std::string(GetColumnName<Col1>()) + Opt + std::string(GetColumnName<Col2>()),
+            .params = {}
+        };
+    }
 
-    template<typename T1, FixedType V2, FixedString Opt> requires IsFixedString<typename decltype(V2)::SaveType>::value
-    struct OneValueCond<T1, V2, Opt> {
-        constexpr static FixedString condition = " " + GetColumnName<T1>() + Opt + "'" + V2.value + "'";
-    };
+    template<FixedString Opt, IsTableColumn Col, IsSQLLiteral V>
+    auto MakeCondition(V v) {
+        return Condition<typeGroup<Col>, std::conditional_t<std::is_same_v<const char *, V>, std::string, V> >{
+            .condition = std::string(GetColumnName<Col>()) + Opt + "?",
+            .params = {v}
+        };
+    }
 
-    template<typename T1, FixedType V2, FixedString Opt> requires (!IsFixedString<typename decltype(V2
-    )::SaveType>::value)
-    struct OneValueCond<T1, V2, Opt> {
-        constexpr static FixedString condition = " " + GetColumnName<T1>() + Opt + toFixedString<V2.value>();
-    };
+    template<FixedString Opt, IsSQLLiteral V1, IsSQLLiteral V2>
+    auto MakeCondition(V1 v1, V2 v2) {
+        return Condition<void, std::conditional_t<std::is_same_v<const char *, V1>, std::string, V1>,
+            std::conditional_t<std::is_same_v<const char *, V2>, std::string, V2> >{
+            .condition = std::string("?") + Opt + "?",
+            .params = {v1, v2}
+        };
+    }
 
-    template<typename T1, FixedType T2>
-    using EqualValueCond = OneValueCond<T1, T2, FixedString(" = ")>;
-    template<typename T1, FixedType T2>
-    using NotEqualValueCond = OneValueCond<T1, T2, FixedString(" != ")>;
-    template<typename T, FixedType V2> requires std::is_integral_v<typename decltype(V2)::SaveType>
-    using GreaterThanValueCond = OneValueCond<T, V2, FixedString(" > ")>;
-    template<typename T, FixedType V2> requires std::is_integral_v<typename decltype(V2)::SaveType>
-    using GreaterThanEqualValueCond = OneValueCond<T, V2, FixedString(" >= ")>;
-    template<typename T, FixedType V2> requires std::is_integral_v<typename decltype(V2)::SaveType>
-    using LessThanValueCond = OneValueCond<T, V2, FixedString(" < ")>;
-    template<typename T, FixedType V2> requires std::is_integral_v<typename decltype(V2)::SaveType>
-    using LessThanEqualValueCond = OneValueCond<T, V2, FixedString(" <= ")>;
+    template<IsTableColumn Col1, IsTableColumn Col2>
+    auto Equal() {
+        return MakeCondition<" = ", Col1, Col2>();
+    }
 
-    template<typename Cond1, typename Cond2>
-    struct AndCond {
-        constexpr static FixedString condition = "(" + Cond1::condition + ") AND (" + Cond2::condition + ")";
-    };
+    template<IsTableColumn Col1, IsTableColumn Col2>
+    auto NotEqual() {
+        return MakeCondition<" != ", Col1, Col2>();
+    }
 
-    template<typename Cond1, typename Cond2>
-    struct OrCond {
-        constexpr static FixedString condition = "(" + Cond1::condition + ") OR (" + Cond2::condition + ")";
-    };
+    template<IsTableColumn Col1, IsTableColumn Col2>
+    auto GreaterThan() {
+        return MakeCondition<" > ", Col1, Col2>();
+    }
+
+    template<IsTableColumn Col1, IsTableColumn Col2>
+    auto GreaterThanEqual() {
+        return MakeCondition<" >= ", Col1, Col2>();
+    }
+
+    template<IsTableColumn Col1, IsTableColumn Col2>
+    auto LessThan() {
+        return MakeCondition<" < ", Col1, Col2>();
+    }
+
+    template<IsTableColumn Col1, IsTableColumn Col2>
+    auto LessThanEqual() {
+        return MakeCondition<" <= ", Col1, Col2>();
+    }
+
+    template<IsTableColumn Col, IsSQLLiteral V>
+    auto Equal(V v) {
+        return MakeCondition<" = ", Col>(v);
+    }
+
+    template<IsTableColumn Col, IsSQLLiteral V>
+    auto NotEqual(V v) {
+        return MakeCondition<" != ", Col>(v);
+    }
+
+    template<IsTableColumn Col, IsSQLLiteral V>
+    auto GreaterThan(V v) {
+        return MakeCondition<" > ", Col>(v);
+    }
+
+    template<IsTableColumn Col, IsSQLLiteral V>
+    auto GreaterThanEqual(V v) {
+        return MakeCondition<" >= ", Col>(v);
+    }
+
+    template<IsTableColumn Col, IsSQLLiteral V>
+    auto LessThan(V v) {
+        return MakeCondition<" < ", Col>(v);
+    }
+
+    template<IsTableColumn Col, IsSQLLiteral V>
+    auto LessThanEqual(V v) {
+        return MakeCondition<" <= ", Col>(v);
+    }
+
+    template<IsSQLLiteral V1, IsSQLLiteral V2>
+    auto Equal(V1 v1, V2 v2) {
+        return MakeCondition<" = ">(v1, v2);
+    }
+
+    template<IsSQLLiteral V1, IsSQLLiteral V2>
+    auto NotEqual(V1 v1, V2 v2) {
+        return MakeCondition<" != ">(v1, v2);
+    }
+
+    template<IsSQLLiteral V1, IsSQLLiteral V2>
+    auto GreaterThan(V1 v1, V2 v2) {
+        return MakeCondition<" > ">(v1, v2);
+    }
+
+    template<IsSQLLiteral V1, IsSQLLiteral V2>
+    auto GreaterThanEqual(V1 v1, V2 v2) {
+        return MakeCondition<" >= ">(v1, v2);
+    }
+
+    template<IsSQLLiteral V1, IsSQLLiteral V2>
+    auto LessThan(V1 v1, V2 v2) {
+        return MakeCondition<" < ">(v1, v2);
+    }
+
+    template<IsSQLLiteral V1, IsSQLLiteral V2>
+    auto LessThanEqual(V1 v1, V2 v2) {
+        return MakeCondition<" <= ">(v1, v2);
+    }
 
     template<ColumnConcept T>
     std::string DefineColumnSQL() {
@@ -436,17 +531,34 @@ namespace SQLiteHelper {
 
     template<typename T>
     void bindValue(sqlite3_stmt *stmt, int index, const T &value) {
-        ;
-        if constexpr (T::type == column_type::TEXT) {
-            sqlite3_bind_text(stmt, index, value.value.c_str(), -1, SQLITE_TRANSIENT);
-        } else if constexpr (T::type == column_type::NUMERIC) {
-            sqlite3_bind_double(stmt, index, static_cast<double>(value.value));
-        } else if constexpr (T::type == column_type::INTEGER) {
-            sqlite3_bind_int(stmt, index, value.value);
-        } else if constexpr (T::type == column_type::REAL) {
-            sqlite3_bind_double(stmt, index, value.value);
-        } else if constexpr (T::type == column_type::BLOB) {
-            sqlite3_bind_blob(stmt, index, value.value.data(), static_cast<int>(value.value.size()), SQLITE_TRANSIENT);
+        if constexpr (ColumnConcept<T>) {
+            // 處理 Column 類型
+            if constexpr (T::type == column_type::TEXT) {
+                sqlite3_bind_text(stmt, index, value.value.c_str(), -1, SQLITE_TRANSIENT);
+            } else if constexpr (T::type == column_type::NUMERIC) {
+                sqlite3_bind_double(stmt, index, static_cast<double>(value.value));
+            } else if constexpr (T::type == column_type::INTEGER) {
+                sqlite3_bind_int(stmt, index, value.value);
+            } else if constexpr (T::type == column_type::REAL) {
+                sqlite3_bind_double(stmt, index, value.value);
+            } else if constexpr (T::type == column_type::BLOB) {
+                sqlite3_bind_blob(stmt, index, value.value.data(), static_cast<int>(value.value.size()),
+                                  SQLITE_TRANSIENT);
+            }
+        } else {
+            // 處理原始值類型
+            if constexpr (std::is_same_v<T, std::string> || std::is_same_v<T, const char *> ||
+                          std::is_same_v<std::decay_t<T>, char *>) {
+                if constexpr (std::is_same_v<T, std::string>) {
+                    sqlite3_bind_text(stmt, index, value.c_str(), -1, SQLITE_TRANSIENT);
+                } else {
+                    sqlite3_bind_text(stmt, index, value, -1, SQLITE_TRANSIENT);
+                }
+            } else if constexpr (std::is_integral_v<T>) {
+                sqlite3_bind_int(stmt, index, value);
+            } else if constexpr (std::is_floating_point_v<T>) {
+                sqlite3_bind_double(stmt, index, value);
+            }
         }
     }
 
@@ -507,8 +619,8 @@ namespace SQLiteHelper {
 
         virtual ~SQLiteWrapper() = default;
 
-        template<typename... ResultColumns>
-        std::vector<std::tuple<ResultColumns...> > Query(const std::string &sql) const {
+        template<typename... ResultColumns, typename... Parameters>
+        std::vector<std::tuple<ResultColumns...> > Query(const std::string &sql, Parameters... parameters) const {
             auto pAutoStmt = MakeAutoStmtPtr();
             {
                 sqlite3_stmt *pStmt = nullptr;
@@ -520,6 +632,20 @@ namespace SQLiteHelper {
                 pAutoStmt = MakeAutoStmtPtr(pStmt);
             }
 
+            // 綁定參數
+            if constexpr (sizeof...(Parameters) > 0) {
+                int index = 1;
+                ([&]() {
+                    if constexpr (std::is_same_v<Parameters, std::string>) {
+                        sqlite3_bind_text(pAutoStmt.get(), index++, parameters.c_str(), -1, SQLITE_TRANSIENT);
+                    } else if constexpr (std::is_integral_v<Parameters>) {
+                        sqlite3_bind_int(pAutoStmt.get(), index++, parameters);
+                    } else if constexpr (std::is_floating_point_v<Parameters>) {
+                        sqlite3_bind_double(pAutoStmt.get(), index++, parameters);
+                    }
+                }(), ...);
+            }
+
             std::vector<std::tuple<ResultColumns...> > ret;
             while (sqlite3_step(pAutoStmt.get()) == SQLITE_ROW) {
                 ret.push_back(GetRowData<ResultColumns...>(pAutoStmt.get()));
@@ -527,8 +653,8 @@ namespace SQLiteHelper {
             return ret;
         }
 
-        template<typename... ResultColumns>
-        void Execute(const std::string &sql, const ResultColumns &... values) const {
+        template<typename... Parameter>
+        void Execute(const std::string &sql, const Parameter &... values) const {
             auto pAutoStmt = MakeAutoStmtPtr();
             {
                 sqlite3_stmt *pStmt = nullptr;
@@ -540,7 +666,7 @@ namespace SQLiteHelper {
                 pAutoStmt = MakeAutoStmtPtr(pStmt);
             }
             int index = 1;
-            (bindValue<ResultColumns>(pAutoStmt.get(), index++, values), ...);
+            (bindValue(pAutoStmt.get(), index++, values), ...);
             if (sqlite3_step(pAutoStmt.get()) != SQLITE_DONE) {
                 throw std::runtime_error(
                     "Failed to execute statement: " + std::string(sqlite3_errmsg(_dbPtr.get())) +
@@ -557,33 +683,115 @@ namespace SQLiteHelper {
         CROSS
     };
 
-    template<JoinType JT, typename Table1, typename Table2, typename Condition>
-    class JoinTable;
-    template<typename Table1, typename Table2, typename Condition>
-    using FullJoinTable = JoinTable<JoinType::FULL, Table1, Table2, Condition>;
-    template<typename Table1, typename Table2, typename Condition>
-    using InnerJoinTable = JoinTable<JoinType::INNER, Table1, Table2, Condition>;
-    template<typename Table1, typename Table2, typename Condition>
-    using LeftJoinTable = JoinTable<JoinType::LEFT, Table1, Table2, Condition>;
-    template<typename Table1, typename Table2, typename Condition>
-    using RightJoinTable = JoinTable<JoinType::RIGHT, Table1, Table2, Condition>;
-    template<typename Table1, typename Table2, typename Condition>
-    using CrossJoinTable = JoinTable<JoinType::CROSS, Table1, Table2, Condition>;
+    template<JoinType jt>
+    constexpr auto GetJoinTypeString() {
+        if constexpr (jt == JoinType::FULL) {
+            return " FULL JOIN ";
+        } else if constexpr (jt == JoinType::INNER) {
+            return " INNER JOIN ";
+        } else if constexpr (jt == JoinType::LEFT) {
+            return " LEFT JOIN ";
+        } else if constexpr (jt == JoinType::RIGHT) {
+            return " RIGHT JOIN ";
+        } else if constexpr (jt == JoinType::CROSS) {
+            return " CROSS JOIN ";
+        }
+        throw std::runtime_error("Unsupported join type");
+    }
 
-    template<FixedString From, typename Columns>
+    inline std::string GetJoinTypeString(const JoinType &jt) {
+        switch (jt) {
+            case JoinType::FULL:
+                return " FULL JOIN ";
+            case JoinType::INNER:
+                return " INNER JOIN ";
+            case JoinType::LEFT:
+                return " LEFT JOIN ";
+            case JoinType::RIGHT:
+                return " RIGHT JOIN ";
+            case JoinType::CROSS:
+                return " CROSS JOIN ";
+            default:
+                throw std::runtime_error("Unsupported join type");
+        }
+    }
+
+    template<typename Src, typename Cond>
+    struct JoinInfo {
+        using Source = Src;
+        JoinType type;
+        Cond condition;
+    };
+
+    template<typename MainSrc, typename... JoinSrcs>
+    struct SourceInfo {
+        using Source = MainSrc;
+        std::tuple<JoinSrcs...> joins;
+    };
+
+    template<typename MainSrc, typename... JoinSrcs, typename NewJoin>
+    auto JoinSource(SourceInfo<MainSrc, JoinSrcs...> src, NewJoin join) {
+        using NewType = SourceInfo<MainSrc, JoinSrcs..., NewJoin>;
+        return NewType{
+            .joins = std::tuple_cat(src.joins, std::make_tuple(std::move(join)))
+        };
+    }
+
+    template<typename MainSrc, typename... Joins>
+    std::string MakeSourceSQL(const SourceInfo<MainSrc, Joins...> &src) {
+        std::string sql = std::string(MainSrc::name);
+        std::apply([&](const auto &... join) {
+            // 展開每個 JoinInfo
+            ((sql += GetJoinTypeString(join.type)
+              + std::string(std::remove_cvref_t<decltype(join)>::Source::name)
+              + " ON " + join.condition.condition), ...);
+        }, src.joins);
+        return sql;
+    }
+
+    // 提取 SourceInfo 中所有 JOIN 條件的參數
+    template<typename MainSrc, typename... Joins>
+    auto ExtractSourceParams(const SourceInfo<MainSrc, Joins...> &src) {
+        return std::apply([](const auto &... join) {
+            return std::tuple_cat(join.condition.params...);
+        }, src.joins);
+    }
+
+    // 特化：沒有 JOIN 時返回空 tuple
+    template<typename MainSrc>
+    auto ExtractSourceParams(const SourceInfo<MainSrc> &src) {
+        return std::tuple<>();
+    }
+
+    template<JoinType JT, typename Table1, typename Table2>
+    class JoinTable;
+    template<typename Table1, typename Table2>
+    using FullJoinTable = JoinTable<JoinType::FULL, Table1, Table2>;
+    template<typename Table1, typename Table2>
+    using InnerJoinTable = JoinTable<JoinType::INNER, Table1, Table2>;
+    template<typename Table1, typename Table2>
+    using LeftJoinTable = JoinTable<JoinType::LEFT, Table1, Table2>;
+    template<typename Table1, typename Table2>
+    using RightJoinTable = JoinTable<JoinType::RIGHT, Table1, Table2>;
+    template<typename Table1, typename Table2>
+    using CrossJoinTable = JoinTable<JoinType::CROSS, Table1, Table2>;
+
+    template<typename Columns, typename Src>
     class QueryAble {
     public:
-        constexpr static FixedString name = From;
         using columns = Columns;
+        using Source = Src;
 
     protected:
         SQLiteWrapper &_sqlite;
+        const Source _source;
 
         template<typename... ResultColumns>
         class SelectQuery {
             const SQLiteWrapper &_sqlite;
+            const Source &_source;
             std::string _basic_sql;
-            std::string _where_sql;
+            std::function<std::vector<std::tuple<ResultColumns...> >()> _query_func;
 
             template<typename T, typename... Ts>
             std::string GetColumnNames() {
@@ -604,24 +812,38 @@ namespace SQLiteHelper {
             }
 
         public:
-            explicit SelectQuery(const SQLiteWrapper &sqlite) : _sqlite(sqlite) {
+            explicit SelectQuery(const SQLiteWrapper &sqlite, const Source &source) : _sqlite(sqlite), _source(source) {
                 _basic_sql = "SELECT " + GetColumnNames<ResultColumns...>();
+                _query_func = [this]() {
+                    auto sql = _basic_sql + " FROM " + MakeSourceSQL(_source) + ";";
+                    auto params = ExtractSourceParams(_source);
+                    return std::apply([this, &sql](auto &&... args) {
+                        return _sqlite.Query<ResultColumns...>(sql, args...);
+                    }, params);
+                };
             }
 
-            template<typename Condition>
-            SelectQuery &Where() {
-                _where_sql = " WHERE " + std::string(Condition::condition);
+            template<typename Cond>
+            SelectQuery &Where(const Cond &condition) {
+                _query_func = [this, condition]() {
+                    auto sql = _basic_sql + " FROM " + MakeSourceSQL(_source) + " WHERE " + condition.condition + ";";
+                    // 合併 JOIN 參數和 WHERE 參數
+                    auto source_params = ExtractSourceParams(_source);
+                    auto all_params = std::tuple_cat(source_params, condition.params);
+                    return std::apply([this, &sql](auto &&... params) {
+                        return _sqlite.Query<ResultColumns...>(sql, params...);
+                    }, all_params);
+                };
                 return *this;
             }
 
-             std::vector<std::tuple<ResultColumns...> > Results() {
-                auto sql = _basic_sql + " FROM " + std::string(From) + _where_sql + ";";
-                return _sqlite.Query<ResultColumns...>(sql);
+            std::vector<std::tuple<ResultColumns...> > Results() {
+                return _query_func();
             }
         };
 
     public:
-        explicit QueryAble(SQLiteWrapper &sqlite) : _sqlite(sqlite) {
+        explicit QueryAble(SQLiteWrapper &sqlite, Source source) : _sqlite(sqlite), _source(source) {
         }
 
         virtual ~QueryAble() = default;
@@ -630,75 +852,69 @@ namespace SQLiteHelper {
         auto Select() const {
             static_assert(isTypeGroupSubset<typeGroup<ResultCol...>, columns>(),
                           "ResultCol must be subset of table columns");
-            return SelectQuery<ResultCol...>(_sqlite);
+            return SelectQuery<ResultCol...>(_sqlite, _source);
         }
 
-        template<typename Table2, typename Condition>
-        auto FullJoin() const {
-            return FullJoinTable<QueryAble, Table2, Condition>(this->_sqlite);
+        template<typename Table2, typename Cond>
+        auto FullJoin(const Cond &condition) const {
+            auto newSource = JoinSource(this->_source, JoinInfo<Table2, Cond>{
+                                            .type = JoinType::FULL,
+                                            .condition = condition
+                                        });
+            return QueryAble<typename ConcatTypeGroup<Columns, typename Table2::columns>::type, decltype(newSource)>(
+                this->_sqlite, newSource);
         }
 
-        template<typename Table2, typename Condition>
-        auto InnerJoin() const {
-            return InnerJoinTable<QueryAble, Table2, Condition>(this->_sqlite);
+        template<typename Table2, typename Cond>
+        auto InnerJoin(const Cond &condition) const {
+            auto newSource = JoinSource(this->_source, JoinInfo<Table2, Cond>{
+                                            .type = JoinType::INNER,
+                                            .condition = condition
+                                        });
+            return QueryAble<typename ConcatTypeGroup<Columns, typename Table2::columns>::type, decltype(newSource)>(
+                this->_sqlite, newSource);
         }
 
-        template<typename Table2, typename Condition>
-        auto LeftJoin() const {
-            return LeftJoinTable<QueryAble, Table2, Condition>(this->_sqlite);
+        template<typename Table2, typename Cond>
+        auto LeftJoin(const Cond &condition) const {
+            auto newSource = JoinSource(this->_source, JoinInfo<Table2, Cond>{
+                                            .type = JoinType::LEFT,
+                                            .condition = condition
+                                        });
+            return QueryAble<typename ConcatTypeGroup<Columns, typename Table2::columns>::type, decltype(newSource)>(
+                this->_sqlite, newSource);
         }
 
-        template<typename Table2, typename Condition>
-        auto RightJoin() const {
-            return RightJoinTable<QueryAble, Table2, Condition>(this->_sqlite);
+        template<typename Table2, typename Cond>
+        auto RightJoin(const Cond &condition) const {
+            auto newSource = JoinSource(this->_source, JoinInfo<Table2, Cond>{
+                                            .type = JoinType::RIGHT,
+                                            .condition = condition
+                                        });
+            return QueryAble<typename ConcatTypeGroup<Columns, typename Table2::columns>::type, decltype(newSource)>(
+                this->_sqlite, newSource);
         }
 
-        template<typename Table2, typename Condition>
-        auto CrossJoin() const {
-            return CrossJoinTable<QueryAble, Table2, Condition>(this->_sqlite);
-        }
-    };
-
-    template<JoinType jt>
-    constexpr auto GetJoinTypeString() {
-        if constexpr (jt == JoinType::FULL) {
-            return FixedString(" FULL JOIN ");
-        } else if constexpr (jt == JoinType::INNER) {
-            return FixedString(" INNER JOIN ");
-        } else if constexpr (jt == JoinType::LEFT) {
-            return FixedString(" LEFT JOIN ");
-        } else if constexpr (jt == JoinType::RIGHT) {
-            return FixedString(" RIGHT JOIN ");
-        } else if constexpr (jt == JoinType::CROSS) {
-            return FixedString(" CROSS JOIN ");
-        }
-        throw std::runtime_error("Unsupported join type");
-    }
-
-
-    template<JoinType JT, typename Table1, typename Table2, typename Condition>
-    class JoinTable : public QueryAble<Table1::name + GetJoinTypeString<JT>() + Table2::name +
-                                       FixedString(" ON ") + Condition::condition, typename ConcatTypeGroup<typename
-                Table1::columns, typename Table2::columns>::type> {
-    public:
-        constexpr static FixedString name = Table1::name + GetJoinTypeString<JT>() + Table2::name +
-                                            FixedString(" ON ") + Condition::condition;
-        using columns = ConcatTypeGroup<typename Table1::columns, typename Table2::columns>::type;
-
-        explicit JoinTable(SQLiteWrapper &sqlite) : QueryAble<Table1::name + GetJoinTypeString<JT>() + Table2::name +
-                                                          FixedString(" ON ") + Condition::condition, typename
-            ConcatTypeGroup<typename
-                Table1::columns, typename Table2::columns>::type>(sqlite) {
+        template<typename Table2, typename Cond>
+        auto CrossJoin(const Cond &condition) const {
+            auto newSource = JoinSource(this->_source, JoinInfo<Table2, Cond>{
+                                            .type = JoinType::CROSS,
+                                            .condition = condition
+                                        });
+            return QueryAble<typename ConcatTypeGroup<Columns, typename Table2::columns>::type, decltype(newSource)>(
+                this->_sqlite, newSource);
         }
     };
 
     template<FixedString TableName, typename... Columns>
-    class Table : public QueryAble<TableName, typeGroup<TableColumn_Base<Table<TableName, Columns...>, Columns>...> > {
+    class Table : public QueryAble<typeGroup<TableColumn_Base<
+                Table<TableName, Columns...>, Columns>...>, SourceInfo<Table<TableName, Columns...> > > {
     public:
         template<typename Col>
         using TableColumn = TableColumn_Base<Table, Col>;
         constexpr static FixedString name = TableName;
         using columns = typeGroup<TableColumn<Columns>...>;
+        using Source = SourceInfo<Table>;
 
     private:
         SQLiteWrapper &_sqlite;
@@ -708,22 +924,42 @@ namespace SQLiteHelper {
             const Table &_table;
             std::tuple<Ts...> datas;
             std::string _basic_sql;
-            std::string _set_sql;
             std::string _where_sql;
+            std::function<void()> _executor;
 
         public:
             explicit UpdateQuery(const Table &table, Ts... ts) : _table(table), datas(std::forward<Ts>(ts)...) {
                 _basic_sql = std::string("UPDATE ") + std::string(name) + " SET " + GetUpdateField<Ts...>();
+                _executor = [this]() {
+                    _table._sqlite.Execute(_basic_sql + ";", std::get<Ts>(datas)...);
+                };
             }
 
             template<typename Condition>
             UpdateQuery &Where() {
                 _where_sql = std::string(" WHERE ") + std::string(Condition::condition);
+                _executor = [this]() {
+                    _table._sqlite.Execute(_basic_sql + _where_sql + ";", std::get<Ts>(datas)...);
+                };
+                return *this;
+            }
+
+            template<typename Cond>
+            UpdateQuery &Where(const Cond &condition) {
+                _where_sql = " WHERE " + condition.condition;
+                _executor = [this, condition]() {
+                    auto sql = _basic_sql + _where_sql + ";";
+                    // 合併 update 的參數和 where 的參數
+                    auto combined_params = std::tuple_cat(datas, condition.params);
+                    std::apply([this, &sql](auto &&... params) {
+                        _table._sqlite.Execute(sql, params...);
+                    }, combined_params);
+                };
                 return *this;
             }
 
             void Execute() {
-                _table._sqlite.Execute(_basic_sql + _where_sql + ";", std::get<Ts>(datas)...);
+                _executor();
             }
         };
 
@@ -731,25 +967,45 @@ namespace SQLiteHelper {
             const Table &_table;
             std::string _basic_sql;
             std::string _where_sql;
+            std::function<void()> _executor;
 
         public:
             explicit DeleteQuery(const Table &table) : _table(table) {
                 _basic_sql = std::string("DELETE FROM ") + std::string(name);
+                _executor = [this]() {
+                    _table._sqlite.Execute(_basic_sql + ";");
+                };
             }
 
             template<typename Condition>
             DeleteQuery &Where() {
                 _where_sql = std::string(" WHERE ") + std::string(Condition::condition);
+                _executor = [this]() {
+                    _table._sqlite.Execute(_basic_sql + _where_sql + ";");
+                };
+                return *this;
+            }
+
+            template<typename Cond>
+            DeleteQuery &Where(const Cond &condition) {
+                _where_sql = " WHERE " + condition.condition;
+                _executor = [this, condition]() {
+                    auto sql = _basic_sql + _where_sql + ";";
+                    std::apply([this, &sql](auto &&... params) {
+                        _table._sqlite.Execute(sql, params...);
+                    }, condition.params);
+                };
                 return *this;
             }
 
             void Execute() {
-                _table._sqlite.Execute(_basic_sql + _where_sql + ";");
+                _executor();
             }
         };
 
     public:
-        explicit Table(SQLiteWrapper &sqlite) : QueryAble<TableName, typeGroup<TableColumn<Columns>...> >(sqlite), _sqlite(sqlite) {
+        explicit Table(SQLiteWrapper &sqlite) : QueryAble<typeGroup<TableColumn<Columns>...>, Source>(sqlite, Source()),
+                                                _sqlite(sqlite) {
             std::string sql = std::string("CREATE TABLE IF NOT EXISTS ") + std::string(name) + " (";
             sql += GetColumnDefinitions<Columns...>();
             sql += ");";
@@ -851,7 +1107,6 @@ namespace SQLiteHelper {
     private:
         SQLiteWrapper _sqlite;
         std::tuple<Table...> _tables;
-
 
     public:
         explicit Database(const std::string &db_path, bool removeExisting = false,
