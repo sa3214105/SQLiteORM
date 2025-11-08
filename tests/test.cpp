@@ -352,6 +352,29 @@ TEST_F(SQLiteHelperTest, TransactionRollback) {
     EXPECT_EQ(results.size(), 0);
 }
 
+TEST_F(SQLiteHelperTest, TransactionExplicitCommit) {
+    SQLiteHelper::Database<UserTable> db("test_database.db");
+    db.CreateTransaction([&db](auto &transaction) {
+        db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("ExplicitCommit"), UserTable::MakeTableColumn<AgeColumn>(77));
+        transaction.Commit(); // 明確呼叫 Commit
+    });
+    auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>, UserTable::TableColumn<AgeColumn>>()
+            .Where<SQLiteHelper::EqualValueCond<NameColumn, "ExplicitCommit">>().Results();
+    EXPECT_EQ(results.size(), 1);
+    EXPECT_EQ(std::get<UserTable::TableColumn<AgeColumn>>(results[0]).value, 77);
+}
+
+TEST_F(SQLiteHelperTest, TransactionExplicitRollback) {
+    SQLiteHelper::Database<UserTable> db("test_database.db");
+    db.CreateTransaction([&db](auto &transaction) {
+        db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("ExplicitRollback"), UserTable::MakeTableColumn<AgeColumn>(66));
+        transaction.Rollback(); // 明確呼叫 Rollback
+    });
+    auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>, UserTable::TableColumn<AgeColumn>>()
+            .Where<SQLiteHelper::EqualValueCond<NameColumn, "ExplicitRollback">>().Results();
+    EXPECT_EQ(results.size(), 0);
+}
+
 // ============ Join 測試 ============
 TEST_F(SQLiteHelperTest, InnerJoinBasic) {
     SQLiteHelper::Database<UserTable, DeptTable> db("test_database.db");

@@ -64,7 +64,7 @@ namespace SQLiteHelper {
     struct FixedString {
         char value[N];
 
-        constexpr FixedString(const char (&str)[N]): value{} {
+        constexpr FixedString(const char (&str)[N]) : value{} {
             for (size_t i = 0; i < N; ++i)
                 value[i] = str[i];
         }
@@ -288,6 +288,9 @@ namespace SQLiteHelper {
             case column_type::BLOB:
                 sql += "BLOB";
                 break;
+            default:
+                throw std::invalid_argument("Unsupported column type");
+                break;
         }
         if (T::constraint.primary_key) {
             sql += " PRIMARY KEY";
@@ -345,50 +348,84 @@ namespace SQLiteHelper {
     auto GetValue(sqlite3_stmt *stmt, int colIndex) {
         T t;
         auto datatype = sqlite3_column_type(stmt, colIndex);
+
+        // 使用 remove_cvref_t 統一處理型別判斷
+        using ValueT = std::remove_cvref_t<decltype(std::declval<T>().value)>;
+
+        constexpr bool is_nullable =
+                (std::is_assignable_v<ValueT &, std::nullptr_t> ||
+                 std::is_constructible_v<ValueT, std::nullptr_t>) &&
+                !std::is_same_v<ValueT, std::string> &&
+                !std::is_same_v<ValueT, std::vector<uint8_t> >;
+
+        // 明確先處理 SQLITE_NULL
+        if (datatype == SQLITE_NULL) {
+            if constexpr (is_nullable) {
+                t.value = nullptr;
+            } else if constexpr (std::is_same_v<ValueT, std::string>) {
+                t.value.clear(); // 對於 string，NULL 用空字串表示
+            } else if constexpr (std::is_same_v<ValueT, std::vector<uint8_t> >) {
+                t.value.clear(); // 對於 vector，NULL 用空容器表示
+            }
+            // 其他型別保留預設值
+            return t;
+        }
+
+        // 處理非 NULL 的情況
         if constexpr (T::type == column_type::TEXT) {
-            if (datatype != SQLITE_TEXT) {
-                // c++ 23 std::is_convertible_v<nullptr_t,std::string>會判定為 true，因此需要額外排除
-                if constexpr (!std::is_same_v<decltype(std::declval<T>().value), std::string> && std::is_convertible_v<nullptr_t, decltype(std::declval<T>().value)>) {
-                    t.value = nullptr;
-                }
-            } else {
+            if (datatype == SQLITE_TEXT) {
                 t.value = reinterpret_cast<const char *>(sqlite3_column_text(stmt, colIndex));
+            } else {
+                // 型別不符，若支援 nullptr 則賦值，否則用預設值
+                if constexpr (is_nullable) {
+                    t.value = nullptr;
+                } else if constexpr (std::is_same_v<ValueT, std::string>) {
+                    t.value.clear();
+                }
             }
         } else if constexpr (T::type == column_type::NUMERIC) {
-            if (datatype != SQLITE_INTEGER) {
-                if constexpr (std::is_convertible_v<nullptr_t, decltype(std::declval<T>().value)>) {
-                    t.value = nullptr;
-                }
-            } else {
+            if (datatype == SQLITE_INTEGER || datatype == SQLITE_FLOAT) {
                 t.value = sqlite3_column_double(stmt, colIndex);
+            } else {
+                if constexpr (is_nullable) {
+                    t.value = nullptr;
+                } else {
+                    t.value = ValueT{}; // 預設值
+                }
             }
         } else if constexpr (T::type == column_type::INTEGER) {
-            if (datatype != SQLITE_INTEGER) {
-                if constexpr (std::is_convertible_v<nullptr_t, decltype(std::declval<T>().value)>) {
-                    t.value = nullptr;
-                }
-            } else {
+            if (datatype == SQLITE_INTEGER) {
                 t.value = sqlite3_column_int(stmt, colIndex);
+            } else {
+                if constexpr (is_nullable) {
+                    t.value = nullptr;
+                } else {
+                    t.value = ValueT{}; // 預設值
+                }
             }
         } else if constexpr (T::type == column_type::REAL) {
-            if (datatype != SQLITE_FLOAT) {
-                if constexpr (std::is_convertible_v<nullptr_t, decltype(std::declval<T>().value)>) {
-                    t.value = nullptr;
-                }
-            } else {
+            if (datatype == SQLITE_FLOAT || datatype == SQLITE_INTEGER) {
                 t.value = sqlite3_column_double(stmt, colIndex);
+            } else {
+                if constexpr (is_nullable) {
+                    t.value = nullptr;
+                } else {
+                    t.value = ValueT{}; // 預設值
+                }
             }
         } else if constexpr (T::type == column_type::BLOB) {
-            if (datatype != SQLITE_BLOB) {
-                if constexpr (std::is_convertible_v<nullptr_t, decltype(std::declval<T>().value)>) {
-                    t.value = nullptr;
-                }
-            } else {
+            if (datatype == SQLITE_BLOB) {
                 auto pBytes = static_cast<const uint8_t *>(sqlite3_column_blob(stmt, colIndex));
                 auto n = static_cast<size_t>(sqlite3_column_bytes(stmt, colIndex));
                 if (pBytes && n > 0) {
                     t.value = std::vector<uint8_t>(pBytes, pBytes + n);
                 } else {
+                    t.value.clear();
+                }
+            } else {
+                if constexpr (is_nullable) {
+                    t.value = nullptr;
+                } else if constexpr (std::is_same_v<ValueT, std::vector<uint8_t> >) {
                     t.value.clear();
                 }
             }
@@ -413,7 +450,7 @@ namespace SQLiteHelper {
     void bindValue(sqlite3_stmt *stmt, int index, const T &value) {
         ;
         if constexpr (T::type == column_type::TEXT) {
-            sqlite3_bind_text(stmt, index, value.value.c_str(), -1, SQLITE_STATIC);
+            sqlite3_bind_text(stmt, index, value.value.c_str(), -1, SQLITE_TRANSIENT);
         } else if constexpr (T::type == column_type::NUMERIC) {
             sqlite3_bind_double(stmt, index, static_cast<double>(value.value));
         } else if constexpr (T::type == column_type::INTEGER) {
@@ -421,7 +458,7 @@ namespace SQLiteHelper {
         } else if constexpr (T::type == column_type::REAL) {
             sqlite3_bind_double(stmt, index, value.value);
         } else if constexpr (T::type == column_type::BLOB) {
-            sqlite3_bind_blob(stmt, index, value.value.data(), static_cast<int>(value.value.size()), SQLITE_STATIC);
+            sqlite3_bind_blob(stmt, index, value.value.data(), static_cast<int>(value.value.size()), SQLITE_TRANSIENT);
         }
     }
 
@@ -430,7 +467,7 @@ namespace SQLiteHelper {
         std::string _db_path;
         std::unique_ptr<sqlite3, decltype(&sqlite3_close)> _dbPtr = {nullptr, sqlite3_close};
 
-        Database_Base(const std::string &dbPath, bool removeExisting = false) : _db_path(dbPath) {
+        Database_Base(const std::string &dbPath ,int Flag, bool removeExisting = false) : _db_path(dbPath) {
             // Optionally delete existing DB file if requested (useful for tests)
             if (removeExisting) {
                 std::error_code ec;
@@ -482,7 +519,7 @@ namespace SQLiteHelper {
 
         template<typename... ResultColumns>
         class SelectQuery {
-            QueryAble &_query_able;
+            const QueryAble &_query_able;
             std::string _basic_sql;
             std::string _where_sql;
 
@@ -505,7 +542,7 @@ namespace SQLiteHelper {
             }
 
         public:
-            explicit SelectQuery(QueryAble &query_able) : _query_able(query_able) {
+            explicit SelectQuery(const QueryAble &query_able) : _query_able(query_able) {
                 _basic_sql = "SELECT " + GetColumnNames<ResultColumns...>();
             }
 
@@ -541,34 +578,34 @@ namespace SQLiteHelper {
         virtual ~QueryAble() = default;
 
         template<typename... ResultCol>
-        auto Select() {
+        auto Select() const {
             static_assert(isTypeGroupSubset<typeGroup<ResultCol...>, columns>(),
                           "ResultCol must be subset of table columns");
             return SelectQuery<ResultCol...>(*this);
         }
 
         template<typename Table2, typename Condition>
-        auto FullJoin() {
+        auto FullJoin() const {
             return FullJoinTable<QueryAble, Table2, Condition>(this->db);
         }
 
         template<typename Table2, typename Condition>
-        auto InnerJoin() {
+        auto InnerJoin() const {
             return InnerJoinTable<QueryAble, Table2, Condition>(this->db);
         }
 
         template<typename Table2, typename Condition>
-        auto LeftJoin() {
+        auto LeftJoin() const {
             return LeftJoinTable<QueryAble, Table2, Condition>(this->db);
         }
 
         template<typename Table2, typename Condition>
-        auto RightJoin() {
+        auto RightJoin() const {
             return RightJoinTable<QueryAble, Table2, Condition>(this->db);
         }
 
         template<typename Table2, typename Condition>
-        auto CrossJoin() {
+        auto CrossJoin() const {
             return CrossJoinTable<QueryAble, Table2, Condition>(this->db);
         }
     };
@@ -715,31 +752,6 @@ namespace SQLiteHelper {
             }
         }
 
-        template<typename Table2, typename Condition>
-        auto FullJoin() {
-            return FullJoinTable<Table, Table2, Condition>(this->db);
-        }
-
-        template<typename Table2, typename Condition>
-        auto InnerJoin() {
-            return InnerJoinTable<Table, Table2, Condition>(this->db);
-        }
-
-        template<typename Table2, typename Condition>
-        auto LeftJoin() {
-            return LeftJoinTable<Table, Table2, Condition>(this->db);
-        }
-
-        template<typename Table2, typename Condition>
-        auto RightJoin() {
-            return RightJoinTable<Table, Table2, Condition>(this->db);
-        }
-
-        template<typename Table2, typename Condition>
-        auto CrossJoin() {
-            return CrossJoinTable<Table, Table2, Condition>(this->db);
-        }
-
         template<typename... U>
         void Insert(U... values) {
             static_assert(isTypeGroupSubset<typeGroup<U...>, columns>(),
@@ -789,11 +801,10 @@ namespace SQLiteHelper {
 
         template<typename U>
         static TableColumn<U> MakeTableColumn(const decltype(std::declval<U>().value) &v) {
-            auto ret =TableColumn<U>();
+            auto ret = TableColumn<U>();
             ret.value = v;
             return ret;
         }
-
     };
 
     template<typename... Table>
@@ -812,30 +823,41 @@ namespace SQLiteHelper {
                 int rc = sqlite3_exec(_db._dbPtr.get(), "BEGIN TRANSACTION;", nullptr, nullptr, &errMsg);
                 if (rc != SQLITE_OK) {
                     std::string msg = errMsg ? errMsg : "Unknown error";
+                    sqlite3_free(errMsg);
                     throw std::runtime_error("Failed to begin transaction: " + msg);
                 }
             }
 
         public:
-            ~Transaction() noexcept(false) {
+            ~Transaction() noexcept {
                 if (_isCommittedOrRolledBack) {
                     return;
                 }
-                // 檢查是否有新的例外發生（包括 C++ 例外或 SQLite 錯誤）
-                bool hasException = (std::uncaught_exceptions() > _exceptionCount) ||
-                                   (sqlite3_errcode(_db._dbPtr.get()) != SQLITE_OK);
+                // 檢查是否有新的例外發生
+                bool hasException = (std::uncaught_exceptions() > _exceptionCount);
 
                 if (hasException) {
                     // 有例外發生，執行 Rollback（不拋出例外）
                     try {
-                        Rollback();
+                        char *errMsg = nullptr;
+                        sqlite3_exec(_db._dbPtr.get(), "ROLLBACK;", nullptr, nullptr, &errMsg);
+                        sqlite3_free(errMsg);
+                        _isCommittedOrRolledBack = true;
                     } catch (...) {
-                        // 解構子中不應拋出例外，忽略 Rollback 錯誤
+                        // 解構子中不拋出例外，靜默處理
                     }
                 } else {
-                    // 正常情況，執行 Commit
-                    // 若在正常情況下 Commit 失敗，應該拋出例外通知使用者
-                    Commit();
+                    // 正常情況，嘗試 Commit（不拋出例外）
+                    // 若使用者需要確保 Commit 成功，應明確呼叫 Commit()
+                    try {
+                        char *errMsg = nullptr;
+                        sqlite3_exec(_db._dbPtr.get(), "COMMIT;", nullptr, nullptr, &errMsg);
+                        sqlite3_free(errMsg);
+                        _isCommittedOrRolledBack = true;
+                    } catch (...) {
+                        // 解構子中不拋出例外，靜默處理
+                        // 如果 Commit 失敗，使用者應該明確呼叫 Commit() 以獲得錯誤通知
+                    }
                 }
             }
 
@@ -847,8 +869,10 @@ namespace SQLiteHelper {
                 char *errMsg = nullptr;
                 if (sqlite3_exec(_db._dbPtr.get(), "ROLLBACK;", nullptr, nullptr, &errMsg) != SQLITE_OK) {
                     std::string msg = errMsg ? errMsg : "Unknown error";
+                    sqlite3_free(errMsg);
                     throw std::runtime_error("Failed to rollback transaction: " + msg);
                 }
+                sqlite3_free(errMsg);
             }
 
             void Commit() {
@@ -859,8 +883,10 @@ namespace SQLiteHelper {
                 char *errMsg = nullptr;
                 if (sqlite3_exec(_db._dbPtr.get(), "COMMIT;", nullptr, nullptr, &errMsg) != SQLITE_OK) {
                     std::string msg = errMsg ? errMsg : "Unknown error";
+                    sqlite3_free(errMsg);
                     throw std::runtime_error("Failed to commit transaction: " + msg);
                 }
+                sqlite3_free(errMsg);
             }
         };
 
