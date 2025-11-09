@@ -12,17 +12,18 @@
 #include <functional>
 
 namespace SQLiteHelper {
+    template<typename... Ts>
+    struct typeGroup;
+
     template<typename T, typename... Ts>
-    struct typeGroup {
+    struct typeGroup<T, Ts...> {
         using type = T;
         using next = typeGroup<Ts...>;
     };
 
-    // 終止版本：最後一個型別
-    template<typename T>
-    struct typeGroup<T> {
-        using type = T;
-        using next = void; // 結尾時沒有下一個
+    template<>
+    struct typeGroup<> {
+        using type = void;
     };
 
     template<typename G1, typename G2>
@@ -37,7 +38,7 @@ namespace SQLiteHelper {
     constexpr bool findTypeInTypeGroup() {
         if constexpr (std::is_same_v<T, typename TG::type>) {
             return true;
-        } else if constexpr (!std::is_void_v<typename TG::next>) {
+        } else if constexpr (!std::is_same_v<typename TG::next, typeGroup<> >) {
             return findTypeInTypeGroup<T, typename TG::next>();
         } else {
             return false;
@@ -50,7 +51,7 @@ namespace SQLiteHelper {
             return true; // 空的 TG1 是任何 TG2 的子集
         } else {
             if constexpr (findTypeInTypeGroup<typename TG1::type, TG2>()) {
-                if constexpr (!std::is_void_v<typename TG1::next>) {
+                if constexpr (!std::is_same_v<typename TG1::next, typeGroup<> >) {
                     return isTypeGroupSubset<typename TG1::next, TG2>();
                 } else {
                     return true; // 已檢查完 TG1 的所有型別
@@ -164,6 +165,12 @@ namespace SQLiteHelper {
     struct IsFixedString<FixedString<N> > : std::true_type {
     };
 
+    // Helper to convert FixedString to a quoted string for DEFAULT
+    template<size_t N>
+    constexpr auto toFixedStringLiteral(const FixedString<N> &fs) {
+        return FixedString("'") + fs + FixedString("'");
+    }
+
     template<typename T, size_t N = 0>
     struct FixedType {
         using SaveType = std::conditional_t<std::is_same_v<char, T> && N != 0, FixedString<N>, T>;
@@ -184,6 +191,24 @@ namespace SQLiteHelper {
         BLOB
     };
 
+    template<column_type type>
+    constexpr auto ColumnTypeToString() {
+        switch (type) {
+            case column_type::TEXT:
+                return "TEXT";
+            case column_type::NUMERIC:
+                return "NUMERIC";
+            case column_type::INTEGER:
+                return "INTEGER";
+            case column_type::REAL:
+                return "REAL";
+            case column_type::BLOB:
+                return "BLOB";
+            default:
+                return "UNKNOWN";
+        }
+    }
+
     struct column_constraint {
         bool primary_key = false;
         bool not_null = false;
@@ -196,7 +221,6 @@ namespace SQLiteHelper {
     {
         { T::type } -> std::convertible_to<column_type>;
         { T::name } -> std::convertible_to<std::string_view>;
-        { T::constraint } -> std::convertible_to<column_constraint>;
     };
 
     template<typename T, ColumnConcept U>
@@ -365,48 +389,114 @@ namespace SQLiteHelper {
         return MakeCondition<" <= ">(v1, v2);
     }
 
-    template<ColumnConcept T>
-    std::string DefineColumnSQL() {
-        std::string sql = std::string(T::name) + " ";
-        switch (T::type) {
-            case column_type::TEXT:
-                sql += "TEXT";
-                break;
-            case column_type::NUMERIC:
-                sql += "NUMERIC";
-                break;
-            case column_type::INTEGER:
-                sql += "INTEGER";
-                break;
-            case column_type::REAL:
-                sql += "REAL";
-                break;
-            case column_type::BLOB:
-                sql += "BLOB";
-                break;
-            default:
-                throw std::invalid_argument("Unsupported column type");
-                break;
+    enum class OrderType {
+        ASC,
+        DESC
+    };
+
+    template<OrderType order>
+    constexpr auto OrderTypeToString() {
+        if constexpr (order == OrderType::ASC) {
+            return FixedString(" ASC");
+        } else {
+            return FixedString(" DESC");
         }
-        if (T::constraint.primary_key) {
-            sql += " PRIMARY KEY";
+    }
+
+    enum class ConflictCause {
+        ROLLBACK,
+        ABORT,
+        FAIL,
+        IGNORE,
+        REPLACE
+    };
+
+    template<ConflictCause Cause>
+    constexpr auto ConflictCauseToString() {
+        if constexpr (Cause == ConflictCause::ROLLBACK) {
+            return FixedString(" ON CONFLICT ROLLBACK");
+        } else if constexpr (Cause == ConflictCause::ABORT) {
+            return FixedString(" ON CONFLICT ABORT");
+        } else if constexpr (Cause == ConflictCause::FAIL) {
+            return FixedString(" ON CONFLICT FAIL");
+        } else if constexpr (Cause == ConflictCause::IGNORE) {
+            return FixedString(" ON CONFLICT IGNORE");
+        } else if constexpr (Cause == ConflictCause::REPLACE) {
+            return FixedString(" ON CONFLICT REPLACE");
         }
-        if (T::constraint.not_null) {
-            sql += " NOT NULL";
+    }
+
+    template<OrderType order = OrderType::ASC, ConflictCause conflictCause = ConflictCause::ABORT>
+    struct PrimaryKey {
+        constexpr static FixedString value = FixedString("PRIMARY KEY") + OrderTypeToString<order>() +
+                                             ConflictCauseToString<conflictCause>();
+    };
+
+    template<ConflictCause conflictCause = ConflictCause::ABORT>
+    struct NotNull {
+        constexpr static FixedString value = "NOT NULL" + ConflictCauseToString<conflictCause>();
+    };
+
+    template<ConflictCause conflictCause = ConflictCause::ABORT>
+    struct Unique {
+        constexpr static FixedString value = "UNIQUE" + ConflictCauseToString<conflictCause>();
+    };
+
+    template<FixedType DefaultValue>
+    struct Default {
+        constexpr static auto GetDefaultValueString() {
+            using ValueType = decltype(DefaultValue.value);
+            if constexpr (IsFixedString<ValueType>::value) {
+                // For string types, wrap in quotes
+                return FixedString("DEFAULT ") + toFixedStringLiteral(DefaultValue.value);
+            } else if constexpr (std::is_integral_v<ValueType>) {
+                // For integer types
+                return FixedString("DEFAULT ") + toFixedString<DefaultValue.value>();
+            } else if constexpr (std::is_floating_point_v<ValueType>) {
+                // For floating point types
+                return FixedString("DEFAULT ") + toFixedString<DefaultValue.value>();
+            } else {
+                return FixedString("DEFAULT ") + toFixedString<DefaultValue.value>();
+            }
         }
-        if (T::constraint.unique) {
-            sql += " UNIQUE";
+
+        constexpr static auto value = GetDefaultValueString();
+    };
+
+    template<FixedString Name, column_type Type, typename... Constraints>
+    struct Column {
+        constexpr static FixedString name = Name;
+        constexpr static column_type type = Type;
+        using constraints = typeGroup<Constraints...>;
+        std::conditional_t<Type == column_type::TEXT, std::string,
+            std::conditional_t<Type == column_type::NUMERIC, double,
+                std::conditional_t<Type == column_type::INTEGER, int,
+                    std::conditional_t<Type == column_type::REAL, double,
+                        std::vector<uint8_t> > > > > value;
+    };
+
+    template<typename TG>
+    constexpr auto CombineConstraintsSQL() {
+        if constexpr (std::is_same_v<TG, typeGroup<> >) {
+            return FixedString(" ");
+        } else if constexpr (!std::is_same_v<typename TG::next, typeGroup<> >) {
+            return " " + TG::type::value + CombineConstraintsSQL<typename TG::next>();
+        } else {
+            return " " + TG::type::value;
         }
-        if (!T::constraint.default_value.empty()) {
-            sql += " DEFAULT " + T::constraint.default_value;
-        }
-        return sql;
+    }
+
+    template<typename Column>
+    constexpr auto GetColumnConstraintsSQL() {
+        return FixedString(" " + Column::name + " ") +
+               ColumnTypeToString<Column::type>() +
+               CombineConstraintsSQL<typename Column::constraints>();
     }
 
     template<ColumnConcept... Columns>
     std::string GetColumnDefinitions() {
         std::string result;
-        ((result += DefineColumnSQL<Columns>() + ","), ...);
+        ((result += GetColumnConstraintsSQL<Columns>() + ","), ...);
         if (!result.empty()) result.pop_back(); // 去掉最後一個逗號
         return result;
     }
@@ -564,22 +654,14 @@ namespace SQLiteHelper {
 
     class SQLiteWrapper {
     private:
-        static void FinalizeStmt(sqlite3_stmt *stmt) {
-            if (stmt) {
-                if (sqlite3_finalize(stmt) != SQLITE_OK) {
-                    throw std::runtime_error("Failed to finalize statement");
-                }
-            }
-        }
-
-        using AutoStmtPtr = std::unique_ptr<sqlite3_stmt, decltype(&FinalizeStmt)>;
+        using AutoStmtPtr = std::unique_ptr<sqlite3_stmt, decltype(&sqlite3_finalize)>;
 
         static AutoStmtPtr MakeAutoStmtPtr() {
-            return {nullptr, FinalizeStmt};
+            return {nullptr, sqlite3_finalize};
         }
 
         static AutoStmtPtr MakeAutoStmtPtr(sqlite3_stmt *stmt) {
-            return {stmt, FinalizeStmt};
+            return {stmt, sqlite3_finalize};
         }
 
         template<typename T, typename... Ts>
