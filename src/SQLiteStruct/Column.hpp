@@ -28,11 +28,11 @@ namespace SQLiteHelper {
         }
     }
 
-    template<FixedString Name, column_type Type, typename... Constraints>
+    template<FixedString Name, column_type Type, ColumnConstraintConcept... Constraints>
     struct Column {
         constexpr static FixedString name = Name;
         constexpr static column_type type = Type;
-        using constraints = typeGroup<Constraints...>;
+        using constraints = TypeGroup<Constraints...>;
         std::conditional_t<Type == column_type::TEXT, std::string,
             std::conditional_t<Type == column_type::NUMERIC, double,
                 std::conditional_t<Type == column_type::INTEGER, int,
@@ -40,34 +40,75 @@ namespace SQLiteHelper {
                         std::vector<uint8_t> > > > > value;
     };
 
-    template<typename T>
-    concept ColumnConcept = requires()
-    {
-        { T::type } -> std::convertible_to<column_type>;
-        { T::name } -> std::convertible_to<std::string_view>;
+    template<typename>
+    struct IsColumn : std::false_type {
     };
+
+    template<FixedString Name, column_type Type, typename... Constraints>
+    struct IsColumn<Column<Name, Type, Constraints...> > : std::true_type {
+    };
+
+    template<typename T>
+    concept ColumnConcept = IsColumn<T>::value;
 
     template<typename T, ColumnConcept U>
     struct TableColumn_Base : U {
         using TableType = T;
     };
 
-    template<typename T>
-    concept IsTableColumn = requires()
-    {
-        typename T::TableType;
+    template<typename>
+    struct IsTableColumn : std::false_type {
+    };
+
+    template<typename T, ColumnConcept U>
+    struct IsTableColumn<TableColumn_Base<T, U> > : std::true_type {
     };
 
     template<typename T>
+    concept TableColumnConcept = IsTableColumn<T>::value;
+
+    template<typename T>
+    concept ColumnOrTableColumnConcept = TableColumnConcept<T> || ColumnConcept<T>;
+
+    template<typename>
+    struct IsColumnOrTableColumnGroup : std::false_type {
+    };
+
+    template<ColumnOrTableColumnConcept ... Columns>
+    struct IsColumnOrTableColumnGroup<TypeGroup<Columns...> > : std::true_type {
+    };
+
+    template<typename T>
+    concept ColumnOrTableColumnGroupConcept = IsColumnOrTableColumnGroup<T>::value;
+
+    template<ColumnOrTableColumnConcept T>
     constexpr auto GetColumnName() {
-        if constexpr (IsTableColumn<T>) {
+        if constexpr (TableColumnConcept<T>) {
             return T::TableType::name + FixedString(".") + T::name;
         } else {
             return T::name;
         }
     }
 
-    template<typename T, typename... Ts>
+    template<ColumnOrTableColumnConcept T, ColumnOrTableColumnConcept... Ts>
+    std::string GetColumnNames() {
+        if constexpr (TableColumnConcept<T>) {
+            if constexpr (sizeof...(Ts) == 0) {
+                return std::string(T::TableType::name) + "." + std::string(T::name);
+            } else {
+                return std::string(T::TableType::name) + "." + std::string(T::name) + "," +
+                       GetColumnNames<Ts...>();
+            }
+        } else {
+            if constexpr (sizeof...(Ts) == 0) {
+                return std::string(T::name);
+            } else {
+                return std::string(T::name) + "," + GetColumnNames<Ts...>();
+            }
+        }
+    }
+
+    template<ColumnOrTableColumnConcept T, ColumnOrTableColumnConcept... Ts>
     std::string GetColumnNamesWithOutTableName() {
         if constexpr (sizeof...(Ts) == 0) {
             return std::string(T::name);
@@ -76,7 +117,7 @@ namespace SQLiteHelper {
         }
     }
 
-    template<typename Column>
+    template<ColumnConcept Column>
     constexpr auto GetColumnDefinition() {
         return FixedString(" " + Column::name + " ") +
                ColumnTypeToString<Column::type>() +

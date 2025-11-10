@@ -1,9 +1,29 @@
 #pragma once
 #include "../SQLiteWrapper.hpp"
 #include "DataSource.h"
+#include "Column.hpp"
+#include "Condition.hpp"
 
 namespace SQLiteHelper {
-    template<typename Columns, typename Src>
+    template<ColumnOrTableColumnGroupConcept Columns, SourceInfoConcept Src>
+    class QueryAble;
+
+    template<typename>
+    struct IsQueryAble : std::false_type {
+    };
+
+    template<ColumnOrTableColumnGroupConcept Columns, SourceInfoConcept Src>
+    struct IsQueryAble<QueryAble<Columns, Src> > : std::true_type {
+    };
+
+    template<typename T>
+    concept ConvertToQueryAbleConcept = requires(T *p)
+    {
+        []<typename... Args>(const QueryAble<Args...> *) {}(p);
+    } || IsQueryAble<T>::value;
+
+
+    template<ColumnOrTableColumnGroupConcept Columns, SourceInfoConcept Src>
     class QueryAble {
     public:
         using columns = Columns;
@@ -13,30 +33,12 @@ namespace SQLiteHelper {
         SQLiteWrapper &_sqlite;
         const Source _source;
 
-        template<typename... ResultColumns>
+        template<TableColumnConcept... ResultColumns>
         class SelectQuery {
             const SQLiteWrapper &_sqlite;
             const Source &_source;
             std::string _basic_sql;
             std::function<std::vector<std::tuple<ResultColumns...> >()> _query_func;
-
-            template<typename T, typename... Ts>
-            std::string GetColumnNames() {
-                if constexpr (IsTableColumn<T>) {
-                    if constexpr (sizeof...(Ts) == 0) {
-                        return std::string(T::TableType::name) + "." + std::string(T::name);
-                    } else {
-                        return std::string(T::TableType::name) + "." + std::string(T::name) + "," +
-                               GetColumnNames<Ts...>();
-                    }
-                } else {
-                    if constexpr (sizeof...(Ts) == 0) {
-                        return std::string(T::name);
-                    } else {
-                        return std::string(T::name) + "," + GetColumnNames<Ts...>();
-                    }
-                }
-            }
 
         public:
             explicit SelectQuery(const SQLiteWrapper &sqlite, const Source &source) : _sqlite(sqlite), _source(source) {
@@ -50,7 +52,7 @@ namespace SQLiteHelper {
                 };
             }
 
-            template<typename Cond>
+            template<ConditionConcept Cond>
             SelectQuery &Where(const Cond &condition) {
                 _query_func = [this, condition]() {
                     auto sql = _basic_sql + " FROM " + MakeSourceSQL(_source) + " WHERE " + condition.condition + ";";
@@ -64,6 +66,7 @@ namespace SQLiteHelper {
                 return *this;
             }
 
+            //TODO 支援迭代器模式
             std::vector<std::tuple<ResultColumns...> > Results() {
                 return _query_func();
             }
@@ -75,14 +78,14 @@ namespace SQLiteHelper {
 
         virtual ~QueryAble() = default;
 
-        template<typename... ResultCol>
+        template<TableColumnConcept... ResultCol>
         auto Select() const {
-            static_assert(isTypeGroupSubset<typeGroup<ResultCol...>, columns>(),
+            static_assert(IsTypeGroupSubset<TypeGroup<ResultCol...>, columns>(),
                           "ResultCol must be subset of table columns");
             return SelectQuery<ResultCol...>(_sqlite, _source);
         }
 
-        template<typename Table2, typename Cond>
+        template<ConvertToQueryAbleConcept Table2, ConditionConcept Cond>
         auto FullJoin(const Cond &condition) const {
             auto newSource = JoinSource(this->_source, DataSource<Table2, Cond>{
                                             .type = JoinType::FULL,
@@ -92,7 +95,7 @@ namespace SQLiteHelper {
                 this->_sqlite, newSource);
         }
 
-        template<typename Table2, typename Cond>
+        template<ConvertToQueryAbleConcept Table2, ConditionConcept Cond>
         auto InnerJoin(const Cond &condition) const {
             auto newSource = JoinSource(this->_source, DataSource<Table2, Cond>{
                                             .type = JoinType::INNER,
@@ -102,7 +105,7 @@ namespace SQLiteHelper {
                 this->_sqlite, newSource);
         }
 
-        template<typename Table2, typename Cond>
+        template<ConvertToQueryAbleConcept Table2, ConditionConcept Cond>
         auto LeftJoin(const Cond &condition) const {
             auto newSource = JoinSource(this->_source, DataSource<Table2, Cond>{
                                             .type = JoinType::LEFT,
@@ -112,7 +115,7 @@ namespace SQLiteHelper {
                 this->_sqlite, newSource);
         }
 
-        template<typename Table2, typename Cond>
+        template<ConvertToQueryAbleConcept Table2, ConditionConcept Cond>
         auto RightJoin(const Cond &condition) const {
             auto newSource = JoinSource(this->_source, DataSource<Table2, Cond>{
                                             .type = JoinType::RIGHT,
@@ -122,7 +125,7 @@ namespace SQLiteHelper {
                 this->_sqlite, newSource);
         }
 
-        template<typename Table2, typename Cond>
+        template<ConvertToQueryAbleConcept Table2, ConditionConcept Cond>
         auto CrossJoin(const Cond &condition) const {
             auto newSource = JoinSource(this->_source, DataSource<Table2, Cond>{
                                             .type = JoinType::CROSS,

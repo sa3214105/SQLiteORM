@@ -2,7 +2,16 @@
 #include "Column.hpp"
 
 namespace SQLiteHelper {
-    template<typename ColumnGroup, typename... Parameters>
+    template<typename T>
+    concept IsSQLNum = std::is_integral_v<T> || std::is_floating_point_v<T>;
+
+    template<typename T>
+    concept IsSQLLiteral = IsSQLNum<T> || std::is_same_v<T, std::string> || std::is_same_v<T, const char *>;
+
+    template<typename T>
+    concept IsSQLNumOrLiteral = IsSQLNum<T> || IsSQLLiteral<T>;
+
+    template<ColumnOrTableColumnGroupConcept ColumnGroup, IsSQLNumOrLiteral... Parameters>
     struct Condition {
         using Columns = ColumnGroup;
         std::string condition;
@@ -27,23 +36,26 @@ namespace SQLiteHelper {
         }
     };
 
+    template<typename>
+    struct IsCondition : std::false_type {
+    };
+    template<ColumnOrTableColumnGroupConcept ColumnGroup, IsSQLNumOrLiteral... Parameters>
+    struct IsCondition<Condition<ColumnGroup, Parameters...> > : std::true_type {
+    };
     template<typename T>
-    concept IsSQLNum = std::is_integral_v<T> || std::is_floating_point_v<T>;
+    concept ConditionConcept = IsCondition<T>::value;
 
-    template<typename T>
-    concept IsSQLLiteral = IsSQLNum<T> || std::is_same_v<T, std::string> || std::is_same_v<T, const char *>;
-
-    template<FixedString Opt, IsTableColumn Col1, IsTableColumn Col2>
+    template<FixedString Opt, TableColumnConcept Col1, TableColumnConcept Col2>
     auto MakeCondition() {
-        return Condition<typeGroup<Col1, Col2> >{
+        return Condition<TypeGroup<Col1, Col2> >{
             .condition = std::string(GetColumnName<Col1>()) + Opt + std::string(GetColumnName<Col2>()),
             .params = {}
         };
     }
 
-    template<FixedString Opt, IsTableColumn Col, IsSQLLiteral V>
+    template<FixedString Opt, TableColumnConcept Col, IsSQLLiteral V>
     auto MakeCondition(V v) {
-        return Condition<typeGroup<Col>, std::conditional_t<std::is_same_v<const char *, V>, std::string, V> >{
+        return Condition<TypeGroup<Col>, std::conditional_t<std::is_same_v<const char *, V>, std::string, V> >{
             .condition = std::string(GetColumnName<Col>()) + Opt + "?",
             .params = {v}
         };
@@ -51,69 +63,69 @@ namespace SQLiteHelper {
 
     template<FixedString Opt, IsSQLLiteral V1, IsSQLLiteral V2>
     auto MakeCondition(V1 v1, V2 v2) {
-        return Condition<void, std::conditional_t<std::is_same_v<const char *, V1>, std::string, V1>,
+        return Condition<TypeGroup<>, std::conditional_t<std::is_same_v<const char *, V1>, std::string, V1>,
             std::conditional_t<std::is_same_v<const char *, V2>, std::string, V2> >{
             .condition = std::string("?") + Opt + "?",
             .params = {v1, v2}
         };
     }
 
-    template<IsTableColumn Col1, IsTableColumn Col2>
+    template<TableColumnConcept Col1, TableColumnConcept Col2>
     auto Equal() {
         return MakeCondition<" = ", Col1, Col2>();
     }
 
-    template<IsTableColumn Col1, IsTableColumn Col2>
+    template<TableColumnConcept Col1, TableColumnConcept Col2>
     auto NotEqual() {
         return MakeCondition<" != ", Col1, Col2>();
     }
 
-    template<IsTableColumn Col1, IsTableColumn Col2>
+    template<TableColumnConcept Col1, TableColumnConcept Col2>
     auto GreaterThan() {
         return MakeCondition<" > ", Col1, Col2>();
     }
 
-    template<IsTableColumn Col1, IsTableColumn Col2>
+    template<TableColumnConcept Col1, TableColumnConcept Col2>
     auto GreaterThanEqual() {
         return MakeCondition<" >= ", Col1, Col2>();
     }
 
-    template<IsTableColumn Col1, IsTableColumn Col2>
+    template<TableColumnConcept Col1, TableColumnConcept Col2>
     auto LessThan() {
         return MakeCondition<" < ", Col1, Col2>();
     }
 
-    template<IsTableColumn Col1, IsTableColumn Col2>
+    template<TableColumnConcept Col1, TableColumnConcept Col2>
     auto LessThanEqual() {
         return MakeCondition<" <= ", Col1, Col2>();
     }
 
-    template<IsTableColumn Col, IsSQLLiteral V>
+    template<TableColumnConcept Col, IsSQLLiteral V>
     auto Equal(V v) {
         return MakeCondition<" = ", Col>(v);
     }
 
-    template<IsTableColumn Col, IsSQLLiteral V>
+    template<TableColumnConcept Col, IsSQLLiteral V>
     auto NotEqual(V v) {
         return MakeCondition<" != ", Col>(v);
     }
 
-    template<IsTableColumn Col, IsSQLLiteral V>
+    template<TableColumnConcept Col, IsSQLLiteral V>
     auto GreaterThan(V v) {
         return MakeCondition<" > ", Col>(v);
     }
 
-    template<IsTableColumn Col, IsSQLLiteral V>
+    template<TableColumnConcept Col, IsSQLLiteral V>
     auto GreaterThanEqual(V v) {
         return MakeCondition<" >= ", Col>(v);
     }
 
-    template<IsTableColumn Col, IsSQLLiteral V>
+    template<TableColumnConcept Col, IsSQLLiteral V>
     auto LessThan(V v) {
         return MakeCondition<" < ", Col>(v);
     }
 
-    template<IsTableColumn Col, IsSQLLiteral V>
+    template<TableColumnConcept Col, IsSQLLiteral V>
     auto LessThanEqual(V v) {
         return MakeCondition<" <= ", Col>(v);
     }

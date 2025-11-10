@@ -55,6 +55,17 @@ namespace SQLiteHelper {
         std::tuple<JoinSrcs...> joins;
     };
 
+    template<typename>
+    struct IsSourceInfo : std::false_type {
+    };
+
+    template<typename MainSrc, typename... JoinSrcs>
+    struct IsSourceInfo<SourceInfo<MainSrc, JoinSrcs...> > : std::true_type {
+    };
+
+    template<typename T>
+    concept SourceInfoConcept = IsSourceInfo<T>::value;
+
     template<typename MainSrc, typename... JoinSrcs, typename NewJoin>
     auto JoinSource(SourceInfo<MainSrc, JoinSrcs...> src, NewJoin join) {
         using NewType = SourceInfo<MainSrc, JoinSrcs..., NewJoin>;

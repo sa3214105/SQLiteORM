@@ -1,6 +1,6 @@
 #pragma once
 namespace SQLiteHelper {
-    template<typename T, typename... Ts>
+    template<ColumnOrTableColumnConcept T, ColumnOrTableColumnConcept... Ts>
     std::string GetUpdateField() {
         if constexpr (sizeof...(Ts) == 0) {
             return std::string(std::string(T::name) + " = ?");
@@ -9,20 +9,20 @@ namespace SQLiteHelper {
         }
     }
 
-    template<FixedString TableName, typename... Columns>
-    class Table final : public QueryAble<typeGroup<TableColumn_Base<
+    template<FixedString TableName,  ColumnConcept... Columns>
+    class Table final : public QueryAble<TypeGroup<TableColumn_Base<
                 Table<TableName, Columns...>, Columns>...>, SourceInfo<Table<TableName, Columns...> > > {
     public:
-        template<typename Col>
+        template<ColumnConcept Col>
         using TableColumn = TableColumn_Base<Table, Col>;
         constexpr static FixedString name = TableName;
-        using columns = typeGroup<TableColumn<Columns>...>;
+        using columns = TypeGroup<TableColumn<Columns>...>;
         using Source = SourceInfo<Table>;
 
     private:
         SQLiteWrapper &_sqlite;
 
-        template<typename... Ts>
+        template<TableColumnConcept... Ts>
         class UpdateQuery {
             const Table &_table;
             std::tuple<Ts...> datas;
@@ -38,16 +38,7 @@ namespace SQLiteHelper {
                 };
             }
 
-            template<typename Condition>
-            UpdateQuery &Where() {
-                _where_sql = std::string(" WHERE ") + std::string(Condition::condition);
-                _executor = [this]() {
-                    _table._sqlite.Execute(_basic_sql + _where_sql + ";", std::get<Ts>(datas)...);
-                };
-                return *this;
-            }
-
-            template<typename Cond>
+            template<ConditionConcept Cond>
             UpdateQuery &Where(const Cond &condition) {
                 _where_sql = " WHERE " + condition.condition;
                 _executor = [this, condition]() {
@@ -80,16 +71,7 @@ namespace SQLiteHelper {
                 };
             }
 
-            template<typename Condition>
-            DeleteQuery &Where() {
-                _where_sql = std::string(" WHERE ") + std::string(Condition::condition);
-                _executor = [this]() {
-                    _table._sqlite.Execute(_basic_sql + _where_sql + ";");
-                };
-                return *this;
-            }
-
-            template<typename Cond>
+            template<ConditionConcept Cond>
             DeleteQuery &Where(const Cond &condition) {
                 _where_sql = " WHERE " + condition.condition;
                 _executor = [this, condition]() {
@@ -107,7 +89,7 @@ namespace SQLiteHelper {
         };
 
     public:
-        explicit Table(SQLiteWrapper &sqlite) : QueryAble<typeGroup<TableColumn<Columns>...>, Source>(sqlite, Source()),
+        explicit Table(SQLiteWrapper &sqlite) : QueryAble<TypeGroup<TableColumn<Columns>...>, Source>(sqlite, Source()),
                                                 _sqlite(sqlite) {
             std::string sql = std::string("CREATE TABLE IF NOT EXISTS ") + std::string(name) + " (";
             sql += GetColumnDefinitions<Columns...>();
@@ -115,9 +97,10 @@ namespace SQLiteHelper {
             sqlite.Execute(sql);
         }
 
-        template<typename... U>
+        //TODO 支援批量插入
+        template<TableColumnConcept... U>
         void Insert(U... values) {
-            static_assert(isTypeGroupSubset<typeGroup<U...>, columns>(),
+            static_assert(IsTypeGroupSubset<TypeGroup<U...>, columns>(),
                           "Insert values must be subset of table columns");
             std::string sql = std::string("INSERT INTO ") + std::string(name) + " (";
             sql += GetColumnNamesWithOutTableName<U...>();
@@ -134,9 +117,9 @@ namespace SQLiteHelper {
             _sqlite.Execute(sql, values...);
         }
 
-        template<typename... U>
+        template<TableColumnConcept... U>
         auto Update(U... values) {
-            static_assert(isTypeGroupSubset<typeGroup<U...>, columns>(),
+            static_assert(IsTypeGroupSubset<TypeGroup<U...>, columns>(),
                           "Update values must be subset of table columns");
             return UpdateQuery(*this, std::forward<U>(values)...);
         }
@@ -145,11 +128,20 @@ namespace SQLiteHelper {
             return DeleteQuery(*this);
         }
 
-        template<typename U>
+        template<ColumnConcept U>
         static TableColumn<U> MakeTableColumn(const decltype(std::declval<U>().value) &v) {
             auto ret = TableColumn<U>();
             ret.value = v;
             return ret;
         }
     };
+
+    template<typename>
+    struct IsTable : std::false_type {
+    };
+    template<FixedString TableName, ColumnConcept... Columns>
+    struct IsTable<Table<TableName, Columns...> > : std::true_type {
+    };
+    template<typename T>
+    concept TableConcept = IsTable<T>::value;
 }

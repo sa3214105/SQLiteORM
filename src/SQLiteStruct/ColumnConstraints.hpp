@@ -1,6 +1,8 @@
 #pragma once
 #include "Order.hpp"
 #include "ConflictCause.hpp"
+#include "../TemplateHelper/FixedType.hpp"
+#include "../TemplateHelper/TypeGroup.hpp"
 
 namespace SQLiteHelper {
     template<OrderType order = OrderType::ASC, ConflictCause conflictCause = ConflictCause::ABORT>
@@ -46,11 +48,45 @@ namespace SQLiteHelper {
         constexpr static auto value = GetDefaultValueString();
     };
 
+    template<typename>
+    struct IsColumnConstraint : std::false_type {
+    };
+
+    template<OrderType order, ConflictCause conflictCause>
+    struct IsColumnConstraint<PrimaryKey<order, conflictCause> > : std::true_type {
+    };
+
+    template<ConflictCause conflictCause>
+    struct IsColumnConstraint<NotNull<conflictCause> > : std::true_type {
+    };
+
+    template<ConflictCause conflictCause>
+    struct IsColumnConstraint<Unique<conflictCause> > : std::true_type {
+    };
+
+    template<FixedType fixType>
+    struct IsColumnConstraint<Default<fixType> > : std::true_type {
+    };
+
+    template<typename T>
+    concept ColumnConstraintConcept = IsColumnConstraint<T>::value;
+
+    template<typename>
+    struct IsColumnConstraintGroup : std::false_type {
+    };
+
+    template<ColumnConstraintConcept ... Constraints>
+    struct IsColumnConstraintGroup<TypeGroup<Constraints...> > : std::true_type {
+    };
+
     template<typename TG>
+    concept ColumnConstraintGroupConcept = IsColumnConstraintGroup<TG>::value;
+
+    template<ColumnConstraintGroupConcept TG>
     constexpr auto GetColumnConstraintsSQL() {
-        if constexpr (std::is_same_v<TG, typeGroup<> >) {
+        if constexpr (std::is_same_v<TG, TypeGroup<> >) {
             return FixedString(" ");
-        } else if constexpr (!std::is_same_v<typename TG::next, typeGroup<> >) {
+        } else if constexpr (!std::is_same_v<typename TG::next, TypeGroup<> >) {
             return " " + TG::type::value + GetColumnConstraintsSQL<typename TG::next>();
         } else {
             return " " + TG::type::value;

@@ -1,6 +1,7 @@
 #pragma once
+#include "Table.hpp"
 namespace SQLiteHelper {
-    template<typename... Table>
+    template<TableConcept... Table>
     class Database {
     public:
         class Transaction {
@@ -65,7 +66,7 @@ namespace SQLiteHelper {
               _tables(Table(_sqlite)...) {
         }
 
-        template<typename T>
+        template<TableConcept T>
         T &GetTable() {
             return std::get<T>(_tables);
         }

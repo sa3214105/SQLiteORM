@@ -1,11 +1,15 @@
 #pragma once
+#include "SQLiteStruct/Column.hpp"
+
 #include "sqlite3.h"
 #include <memory>
+#include <filesystem>
 
 namespace SQLiteHelper {
+    //TODO Column類型不要在這邊做處理
     template<typename T>
     void bindValue(sqlite3_stmt *stmt, int index, const T &value) {
-        if constexpr (ColumnConcept<T>) {
+        if constexpr (ColumnOrTableColumnConcept<T>) {
             // 處理 Column 類型
             if constexpr (T::type == column_type::TEXT) {
                 sqlite3_bind_text(stmt, index, value.value.c_str(), -1, SQLITE_TRANSIENT);
@@ -32,6 +36,8 @@ namespace SQLiteHelper {
                 sqlite3_bind_int(stmt, index, value);
             } else if constexpr (std::is_floating_point_v<T>) {
                 sqlite3_bind_double(stmt, index, value);
+            } else {
+                static_assert([](){return false;}(), "Unsupported type for bindValue");
             }
         }
     }
