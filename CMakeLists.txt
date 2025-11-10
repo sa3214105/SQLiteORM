@@ -4,7 +4,7 @@ project(SQLiteHelper)
 set(CMAKE_CXX_STANDARD 20)
 
 add_library(SQLiteHelper INTERFACE)
-target_sources(SQLiteHelper INTERFACE SQLiteHelper.hpp)
+target_sources(SQLiteHelper INTERFACE src/SQLiteHelper.hpp)
 target_include_directories(SQLiteHelper INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Coverage option and flags
@@ -25,9 +25,7 @@ option(ENABLE_TESTS "Enable building tests" ON)
 if(ENABLE_TESTS AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     #find_package(SQLite3 REQUIRED)
 
-    add_library(sqlite3_static STATIC
-            external/sqlite/sqlite3.c
-    )
+    add_library(sqlite3_static STATIC external/sqlite/sqlite3.c)
     target_include_directories(sqlite3_static PUBLIC `extern/sqlite`)
     target_compile_definitions(sqlite3_static PRIVATE
             SQLITE_OMIT_LOAD_EXTENSION=1

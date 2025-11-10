@@ -1,6 +1,6 @@
 #include <iostream>
 #include <gtest/gtest.h>
-#include "../SQLiteHelper.hpp"
+#include "../src/SQLiteHelper.hpp"
 
 using namespace SQLiteHelper;
 
