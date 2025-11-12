@@ -155,7 +155,7 @@ namespace SQLiteHelper {
         SQLiteWrapper &_sqlite;
 
         template<TableColumnConcept... Ts>
-        class UpdateQuery {
+        class UpdateStatement {
             const Table &_table;
             std::tuple<Ts...> datas;
             std::string _basic_sql;
@@ -163,7 +163,7 @@ namespace SQLiteHelper {
             std::function<void()> _executor;
 
         public:
-            explicit UpdateQuery(const Table &table, Ts... ts) : _table(table), datas(std::forward<Ts>(ts)...) {
+            explicit UpdateStatement(const Table &table, Ts... ts) : _table(table), datas(std::forward<Ts>(ts)...) {
                 _basic_sql = std::string("UPDATE ") + std::string(name) + " SET " + GetUpdateField<Ts...>();
                 _executor = [this]() {
                     _table._sqlite.Execute(_basic_sql + ";", std::get<Ts>(datas)...);
@@ -171,7 +171,7 @@ namespace SQLiteHelper {
             }
 
             template<ConditionConcept Cond>
-            UpdateQuery &Where(const Cond &condition) {
+            UpdateStatement &Where(const Cond &condition) {
                 _where_sql = " WHERE " + condition.condition;
                 _executor = [this, condition]() {
                     auto sql = _basic_sql + _where_sql + ";";
@@ -189,14 +189,14 @@ namespace SQLiteHelper {
             }
         };
 
-        class DeleteQuery {
+        class DeleteStatement {
             const Table &_table;
             std::string _basic_sql;
             std::string _where_sql;
             std::function<void()> _executor;
 
         public:
-            explicit DeleteQuery(const Table &table) : _table(table) {
+            explicit DeleteStatement(const Table &table) : _table(table) {
                 _basic_sql = std::string("DELETE FROM ") + std::string(name);
                 _executor = [this]() {
                     _table._sqlite.Execute(_basic_sql + ";");
@@ -204,7 +204,7 @@ namespace SQLiteHelper {
             }
 
             template<ConditionConcept Cond>
-            DeleteQuery &Where(const Cond &condition) {
+            DeleteStatement &Where(const Cond &condition) {
                 _where_sql = " WHERE " + condition.condition;
                 _executor = [this, condition]() {
                     auto sql = _basic_sql + _where_sql + ";";
@@ -256,11 +256,11 @@ namespace SQLiteHelper {
         auto Update(U... values) {
             static_assert(IsTypeGroupSubset<TypeGroup<U...>, columns>(),
                           "Update values must be subset of table columns");
-            return UpdateQuery(*this, std::forward<U>(values)...);
+            return UpdateStatement(*this, std::forward<U>(values)...);
         }
 
         auto Delete() {
-            return DeleteQuery(*this);
+            return DeleteStatement(*this);
         }
 
         template<ColumnConcept U>

@@ -34,14 +34,14 @@ namespace SQLiteHelper {
         const Source _source;
 
         template<TableColumnConcept... ResultColumns>
-        class SelectQuery {
+        class SelectStatement {
             const SQLiteWrapper &_sqlite;
             const Source &_source;
             std::string _basic_sql;
             std::function<std::vector<std::tuple<ResultColumns...> >()> _query_func;
 
         public:
-            explicit SelectQuery(const SQLiteWrapper &sqlite, const Source &source) : _sqlite(sqlite), _source(source) {
+            explicit SelectStatement(const SQLiteWrapper &sqlite, const Source &source) : _sqlite(sqlite), _source(source) {
                 _basic_sql = "SELECT " + GetColumnNames<ResultColumns...>();
                 _query_func = [this]() {
                     auto sql = _basic_sql + " FROM " + MakeSourceSQL(_source) + ";";
@@ -53,7 +53,7 @@ namespace SQLiteHelper {
             }
 
             template<ConditionConcept Cond>
-            SelectQuery &Where(const Cond &condition) {
+            SelectStatement &Where(const Cond &condition) {
                 _query_func = [this, condition]() {
                     auto sql = _basic_sql + " FROM " + MakeSourceSQL(_source) + " WHERE " + condition.condition + ";";
                     // 合併 JOIN 參數和 WHERE 參數
@@ -82,7 +82,7 @@ namespace SQLiteHelper {
         auto Select() const {
             static_assert(IsTypeGroupSubset<TypeGroup<ResultCol...>, columns>(),
                           "ResultCol must be subset of table columns");
-            return SelectQuery<ResultCol...>(_sqlite, _source);
+            return SelectStatement<ResultCol...>(_sqlite, _source);
         }
 
         template<ConvertToQueryAbleConcept Table2, ConditionConcept Cond>
