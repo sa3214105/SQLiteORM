@@ -1,5 +1,6 @@
 #pragma once
 #include "ColumnConstraints.hpp"
+#include "../TemplateHelper/FixedString.hpp"
 
 namespace SQLiteHelper {
     enum class column_type {
@@ -114,6 +115,18 @@ namespace SQLiteHelper {
             return std::string(T::name);
         } else {
             return std::string(T::name) + "," + GetColumnNamesWithOutTableName<Ts...>();
+        }
+    }
+
+    template<ColumnOrTableColumnGroupConcept TG>
+    constexpr auto GetNamesFromColumnOrTableColumnGroup() {
+        if constexpr (std::is_same_v<TG, TypeGroup<> >) {
+            return FixedString("");
+        } else if constexpr (!std::is_same_v<typename TG::next, TypeGroup<> >) {
+            return GetColumnName<typename TG::type>() + FixedString(",") +
+                   GetNamesFromColumnOrTableColumnGroup<typename TG::next>();
+        } else {
+            return GetColumnName<typename TG::type>();
         }
     }
 

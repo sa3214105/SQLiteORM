@@ -6,18 +6,18 @@
 
 namespace SQLiteHelper {
     template<OrderType order = OrderType::ASC, ConflictCause conflictCause = ConflictCause::ABORT>
-    struct PrimaryKey {
+    struct ColumnPrimaryKey {
         constexpr static FixedString value = FixedString("PRIMARY KEY") + OrderTypeToString<order>() +
                                              ConflictCauseToString<conflictCause>();
     };
 
     template<ConflictCause conflictCause = ConflictCause::ABORT>
-    struct NotNull {
+    struct ColumnNotNull {
         constexpr static FixedString value = "NOT NULL" + ConflictCauseToString<conflictCause>();
     };
 
     template<ConflictCause conflictCause = ConflictCause::ABORT>
-    struct Unique {
+    struct ColumnUnique {
         constexpr static FixedString value = "UNIQUE" + ConflictCauseToString<conflictCause>();
     };
 
@@ -53,15 +53,15 @@ namespace SQLiteHelper {
     };
 
     template<OrderType order, ConflictCause conflictCause>
-    struct IsColumnConstraint<PrimaryKey<order, conflictCause> > : std::true_type {
+    struct IsColumnConstraint<ColumnPrimaryKey<order, conflictCause> > : std::true_type {
     };
 
     template<ConflictCause conflictCause>
-    struct IsColumnConstraint<NotNull<conflictCause> > : std::true_type {
+    struct IsColumnConstraint<ColumnNotNull<conflictCause> > : std::true_type {
     };
 
     template<ConflictCause conflictCause>
-    struct IsColumnConstraint<Unique<conflictCause> > : std::true_type {
+    struct IsColumnConstraint<ColumnUnique<conflictCause> > : std::true_type {
     };
 
     template<FixedType fixType>

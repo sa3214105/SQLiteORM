@@ -1,5 +1,52 @@
 #pragma once
+#include "TableConstraint.hpp"
+
 namespace SQLiteHelper {
+    // Helper to filter only columns from a parameter pack
+    template<typename... Items>
+    struct FilterColumns;
+
+    template<>
+    struct FilterColumns<> {
+        using type = TypeGroup<>;
+    };
+
+    template<typename T, typename... Rest>
+    struct FilterColumns<T, Rest...> {
+        using type = std::conditional_t<
+            ColumnConcept<T>,
+            typename ConcatTypeGroup<TypeGroup<T>, typename FilterColumns<Rest...>::type>::type,
+            typename FilterColumns<Rest...>::type
+        >;
+    };
+
+    // Helper to filter only table constraints from a parameter pack
+    template<typename... Items>
+    struct FilterTableConstraints;
+
+    template<>
+    struct FilterTableConstraints<> {
+        using type = TypeGroup<>;
+    };
+
+    template<typename T, typename... Rest>
+    struct FilterTableConstraints<T, Rest...> {
+        using type = std::conditional_t<
+            TableConstraintConcept<T>,
+            typename ConcatTypeGroup<TypeGroup<T>, typename FilterTableConstraints<Rest...>::type>::type,
+            typename FilterTableConstraints<Rest...>::type
+        >;
+    };
+
+    // Helper to extract column types from TypeGroup as parameter pack
+    template<typename TG>
+    struct TypeGroupToPackHelper;
+
+    template<typename... Ts>
+    struct TypeGroupToPackHelper<TypeGroup<Ts...>> {
+        using type = TypeGroup<Ts...>;
+    };
+
     template<ColumnOrTableColumnConcept T, ColumnOrTableColumnConcept... Ts>
     std::string GetUpdateField() {
         if constexpr (sizeof...(Ts) == 0) {
@@ -9,14 +56,65 @@ namespace SQLiteHelper {
         }
     }
 
-    template<FixedString TableName,  ColumnConcept... Columns>
-    class Table final : public QueryAble<TypeGroup<TableColumn_Base<
-                Table<TableName, Columns...>, Columns>...>, SourceInfo<Table<TableName, Columns...> > > {
+    // Helper to generate table constraint SQL from TypeGroup
+    template<typename ConstraintsTG>
+    std::string GetTableConstraintSQL() {
+        if constexpr (std::is_same_v<ConstraintsTG, TypeGroup<>>) {
+            return "";
+        } else {
+            using CurrentConstraint = typename ConstraintsTG::type;
+            std::string result = ", " + std::string(CurrentConstraint::value);
+            if constexpr (!std::is_same_v<typename ConstraintsTG::next, TypeGroup<>>) {
+                result += GetTableConstraintSQL<typename ConstraintsTG::next>();
+            }
+            return result;
+        }
+    }
+
+    // Helper to generate column definitions from TypeGroup of columns
+    template<typename ColumnsTG>
+    std::string GetColumnDefinitionsFromTypeGroup() {
+        if constexpr (std::is_same_v<ColumnsTG, TypeGroup<>>) {
+            return "";
+        } else {
+            using CurrentColumn = typename ColumnsTG::type;
+            std::string result = GetColumnDefinition<CurrentColumn>();
+            if constexpr (!std::is_same_v<typename ColumnsTG::next, TypeGroup<>>) {
+                result += "," + GetColumnDefinitionsFromTypeGroup<typename ColumnsTG::next>();
+            }
+            return result;
+        }
+    }
+
+    // Forward declaration
+    template<FixedString TableName, ColumnOrTableConstraintConcept... Items>
+    class Table;
+
+    // Helper to generate TableColumn TypeGroup from filtered columns
+    template<typename TableType, typename ColumnsTG>
+    struct GenerateTableColumns;
+
+    template<typename TableType, typename... Columns>
+    struct GenerateTableColumns<TableType, TypeGroup<Columns...>> {
+        using type = TypeGroup<TableColumn_Base<TableType, Columns>...>;
+    };
+
+    template<FixedString TableName, ColumnOrTableConstraintConcept... Items>
+    class Table final : public QueryAble<
+                typename GenerateTableColumns<
+                    Table<TableName, Items...>,
+                    typename FilterColumns<Items...>::type
+                >::type,
+                SourceInfo<Table<TableName, Items...> > > {
+    private:
+        using FilteredColumns = typename FilterColumns<Items...>::type;
+        using FilteredConstraints = typename FilterTableConstraints<Items...>::type;
+
     public:
         template<ColumnConcept Col>
         using TableColumn = TableColumn_Base<Table, Col>;
         constexpr static FixedString name = TableName;
-        using columns = TypeGroup<TableColumn<Columns>...>;
+        using columns = typename GenerateTableColumns<Table, FilteredColumns>::type;
         using Source = SourceInfo<Table>;
 
     private:
@@ -89,10 +187,11 @@ namespace SQLiteHelper {
         };
 
     public:
-        explicit Table(SQLiteWrapper &sqlite) : QueryAble<TypeGroup<TableColumn<Columns>...>, Source>(sqlite, Source()),
+        explicit Table(SQLiteWrapper &sqlite) : QueryAble<columns, Source>(sqlite, Source()),
                                                 _sqlite(sqlite) {
             std::string sql = std::string("CREATE TABLE IF NOT EXISTS ") + std::string(name) + " (";
-            sql += GetColumnDefinitions<Columns...>();
+            sql += GetColumnDefinitionsFromTypeGroup<FilteredColumns>();
+            sql += GetTableConstraintSQL<FilteredConstraints>();
             sql += ");";
             sqlite.Execute(sql);
         }
@@ -139,8 +238,8 @@ namespace SQLiteHelper {
     template<typename>
     struct IsTable : std::false_type {
     };
-    template<FixedString TableName, ColumnConcept... Columns>
-    struct IsTable<Table<TableName, Columns...> > : std::true_type {
+    template<FixedString TableName, ColumnOrTableConstraintConcept... Items>
+    struct IsTable<Table<TableName, Items...> > : std::true_type {
     };
     template<typename T>
     concept TableConcept = IsTable<T>::value;
