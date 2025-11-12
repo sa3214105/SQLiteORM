@@ -65,6 +65,15 @@ namespace SQLiteHelper {
     //TODO CHECK暫時不實作
     //TODO FOREIGN KEY暫時不實作
 
+    // Table options (applied after table definition)
+    struct WithoutRowId {
+        constexpr static FixedString value = FixedString(" WITHOUT ROWID");
+    };
+
+    struct Strict {
+        constexpr static FixedString value = FixedString(" STRICT");
+    };
+
     // Table constraint concept
     template<typename>
     struct IsTableConstraint : std::false_type {
@@ -81,6 +90,25 @@ namespace SQLiteHelper {
     template<typename T>
     concept TableConstraintConcept = IsTableConstraint<T>::value;
 
+    // Table option concept
+    template<typename>
+    struct IsTableOption : std::false_type {
+    };
+
+    template<>
+    struct IsTableOption<WithoutRowId> : std::true_type {
+    };
+
+    template<>
+    struct IsTableOption<Strict> : std::true_type {
+    };
+
+    template<typename T>
+    concept TableOptionConcept = IsTableOption<T>::value;
+
     template<typename T>
     concept ColumnOrTableConstraintConcept = ColumnConcept<T> || TableConstraintConcept<T>;
+
+    template<typename T>
+    concept ColumnOrTableConstraintOrOptionConcept = ColumnConcept<T> || TableConstraintConcept<T> || TableOptionConcept<T>;
 }

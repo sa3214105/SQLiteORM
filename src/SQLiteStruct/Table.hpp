@@ -38,6 +38,24 @@ namespace SQLiteHelper {
         >;
     };
 
+    // Helper to filter only table options from a parameter pack
+    template<typename... Items>
+    struct FilterTableOptions;
+
+    template<>
+    struct FilterTableOptions<> {
+        using type = TypeGroup<>;
+    };
+
+    template<typename T, typename... Rest>
+    struct FilterTableOptions<T, Rest...> {
+        using type = std::conditional_t<
+            TableOptionConcept<T>,
+            typename ConcatTypeGroup<TypeGroup<T>, typename FilterTableOptions<Rest...>::type>::type,
+            typename FilterTableOptions<Rest...>::type
+        >;
+    };
+
     // Helper to extract column types from TypeGroup as parameter pack
     template<typename TG>
     struct TypeGroupToPackHelper;
@@ -71,6 +89,21 @@ namespace SQLiteHelper {
         }
     }
 
+    // Helper to generate table options SQL from TypeGroup (applied after closing parenthesis)
+    template<typename OptionsTG>
+    std::string GetTableOptionsSQL() {
+        if constexpr (std::is_same_v<OptionsTG, TypeGroup<>>) {
+            return "";
+        } else {
+            using CurrentOption = typename OptionsTG::type;
+            std::string result = std::string(CurrentOption::value);
+            if constexpr (!std::is_same_v<typename OptionsTG::next, TypeGroup<>>) {
+                result += "," + GetTableOptionsSQL<typename OptionsTG::next>();
+            }
+            return result;
+        }
+    }
+
     // Helper to generate column definitions from TypeGroup of columns
     template<typename ColumnsTG>
     std::string GetColumnDefinitionsFromTypeGroup() {
@@ -87,7 +120,7 @@ namespace SQLiteHelper {
     }
 
     // Forward declaration
-    template<FixedString TableName, ColumnOrTableConstraintConcept... Items>
+    template<FixedString TableName, ColumnOrTableConstraintOrOptionConcept... Items>
     class Table;
 
     // Helper to generate TableColumn TypeGroup from filtered columns
@@ -99,7 +132,7 @@ namespace SQLiteHelper {
         using type = TypeGroup<TableColumn_Base<TableType, Columns>...>;
     };
 
-    template<FixedString TableName, ColumnOrTableConstraintConcept... Items>
+    template<FixedString TableName, ColumnOrTableConstraintOrOptionConcept... Items>
     class Table final : public QueryAble<
                 typename GenerateTableColumns<
                     Table<TableName, Items...>,
@@ -109,6 +142,7 @@ namespace SQLiteHelper {
     private:
         using FilteredColumns = typename FilterColumns<Items...>::type;
         using FilteredConstraints = typename FilterTableConstraints<Items...>::type;
+        using FilteredOptions = typename FilterTableOptions<Items...>::type;
 
     public:
         template<ColumnConcept Col>
@@ -192,7 +226,9 @@ namespace SQLiteHelper {
             std::string sql = std::string("CREATE TABLE IF NOT EXISTS ") + std::string(name) + " (";
             sql += GetColumnDefinitionsFromTypeGroup<FilteredColumns>();
             sql += GetTableConstraintSQL<FilteredConstraints>();
-            sql += ");";
+            sql += ")";
+            sql += GetTableOptionsSQL<FilteredOptions>();
+            sql += ";";
             sqlite.Execute(sql);
         }
 
@@ -238,7 +274,7 @@ namespace SQLiteHelper {
     template<typename>
     struct IsTable : std::false_type {
     };
-    template<FixedString TableName, ColumnOrTableConstraintConcept... Items>
+    template<FixedString TableName, ColumnOrTableConstraintOrOptionConcept... Items>
     struct IsTable<Table<TableName, Items...> > : std::true_type {
     };
     template<typename T>
