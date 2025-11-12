@@ -252,6 +252,42 @@ namespace SQLiteHelper {
             _sqlite.Execute(sql, values...);
         }
 
+        // 批量插入支援
+        template<TableColumnConcept... U>
+        void InsertMany(const std::vector<std::tuple<U...>>& rows) {
+            static_assert(IsTypeGroupSubset<TypeGroup<U...>, columns>(),
+                          "Insert values must be subset of table columns");
+
+            if (rows.empty()) {
+                return;
+            }
+
+            // 使用 SQLiteWrapper::Transaction 來提高批量插入效能
+            SQLiteWrapper::Transaction transaction(_sqlite);
+
+            // 準備 SQL 語句
+            std::string sql = std::string("INSERT INTO ") + std::string(name) + " (";
+            sql += GetColumnNamesWithOutTableName<U...>();
+            sql += ") VALUES (";
+            for (size_t j = 0; j < sizeof...(U); ++j) {
+                sql += "?, ";
+            }
+            sql.pop_back(); // 去掉最後一個空格
+            sql.pop_back(); // 去掉最後一個逗號
+            sql += ");";
+
+            // 對每一行執行插入
+            for (const auto& row : rows) {
+                std::apply([this, &sql](auto&&... values) {
+                    _sqlite.Execute(sql, values...);
+                }, row);
+            }
+
+            // Transaction 解構子會自動 Commit（如果沒有異常）或 Rollback（如果有異常）
+        }
+
+    public:
+
         template<TableColumnConcept... U>
         auto Update(U... values) {
             static_assert(IsTypeGroupSubset<TypeGroup<U...>, columns>(),

@@ -132,6 +132,57 @@ namespace SQLiteHelper {
     }
 
     class SQLiteWrapper final {
+    public:
+        // Transaction 類別，使用 RAII 模式管理交易
+        class Transaction {
+        private:
+            SQLiteWrapper &_sqlite;
+            bool _isCommittedOrRolledBack = false;
+            int _exceptionCount;
+
+        public:
+            explicit Transaction(SQLiteWrapper &sqlite)
+                : _sqlite(sqlite), _exceptionCount(std::uncaught_exceptions()) {
+                _sqlite.Execute("BEGIN TRANSACTION;");
+            }
+
+            ~Transaction() noexcept {
+                if (_isCommittedOrRolledBack) {
+                    return;
+                }
+
+                if (std::uncaught_exceptions() > _exceptionCount) {
+                    try {
+                        Rollback();
+                    } catch (const std::exception &exception) {
+                        std::cerr << exception.what() << std::endl;
+                    }
+                } else {
+                    try {
+                        Commit();
+                    } catch (const std::exception &exception) {
+                        std::cerr << exception.what() << std::endl;
+                    }
+                }
+            }
+
+            void Rollback() {
+                if (_isCommittedOrRolledBack) {
+                    throw std::runtime_error("Multiple commit/rollback calls on the same transaction");
+                }
+                _isCommittedOrRolledBack = true;
+                _sqlite.Execute("ROLLBACK;");
+            }
+
+            void Commit() {
+                if (_isCommittedOrRolledBack) {
+                    throw std::runtime_error("Multiple commit/rollback calls on the same transaction");
+                }
+                _isCommittedOrRolledBack = true;
+                _sqlite.Execute("COMMIT;");
+            }
+        };
+
     private:
         using AutoStmtPtr = std::unique_ptr<sqlite3_stmt, decltype(&sqlite3_finalize)>;
 

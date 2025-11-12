@@ -4,56 +4,8 @@ namespace SQLiteHelper {
     template<TableConcept... Table>
     class Database {
     public:
-        class Transaction {
-            friend class Database;
-
-        private:
-            SQLiteWrapper &_sqlite;
-            bool _isCommittedOrRolledBack = false;
-            int _exceptionCount;
-
-            explicit Transaction(SQLiteWrapper &sqlite) : _sqlite(sqlite), _exceptionCount(std::uncaught_exceptions()) {
-                char *errMsg = nullptr;
-                _sqlite.Execute("BEGIN TRANSACTION;");
-            }
-
-        public:
-            ~Transaction() noexcept {
-                if (_isCommittedOrRolledBack) {
-                    return;
-                }
-
-                if (std::uncaught_exceptions() > _exceptionCount) {
-                    try {
-                        Rollback();
-                    } catch (const std::exception &exception) {
-                        std::cerr << exception.what() << std::endl;
-                    }
-                } else {
-                    try {
-                        Commit();
-                    } catch (const std::exception &exception) {
-                        std::cerr << exception.what() << std::endl;
-                    }
-                }
-            }
-
-            void Rollback() {
-                if (_isCommittedOrRolledBack) {
-                    throw std::runtime_error("Multiple commit/rollback calls on the same transaction");
-                }
-                _isCommittedOrRolledBack = true;
-                _sqlite.Execute("ROLLBACK;");
-            }
-
-            void Commit() {
-                if (_isCommittedOrRolledBack) {
-                    throw std::runtime_error("Multiple commit/rollback calls on the same transaction");
-                }
-                _isCommittedOrRolledBack = true;
-                _sqlite.Execute("COMMIT;");
-            }
-        };
+        // 使用 SQLiteWrapper 的 Transaction
+        using Transaction = SQLiteWrapper::Transaction;
 
     private:
         SQLiteWrapper _sqlite;
