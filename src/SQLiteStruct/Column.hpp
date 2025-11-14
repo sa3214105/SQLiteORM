@@ -92,20 +92,11 @@ namespace SQLiteHelper {
     }
 
     template<ColumnOrTableColumnConcept T, ColumnOrTableColumnConcept... Ts>
-    std::string GetColumnNames() {
-        if constexpr (TableColumnConcept<T>) {
-            if constexpr (sizeof...(Ts) == 0) {
-                return std::string(T::TableType::name) + "." + std::string(T::name);
-            } else {
-                return std::string(T::TableType::name) + "." + std::string(T::name) + "," +
-                       GetColumnNames<Ts...>();
-            }
+    constexpr auto GetColumnNames() {
+        if constexpr (sizeof...(Ts) == 0) {
+            return GetColumnName<T>();
         } else {
-            if constexpr (sizeof...(Ts) == 0) {
-                return std::string(T::name);
-            } else {
-                return std::string(T::name) + "," + GetColumnNames<Ts...>();
-            }
+            return GetColumnName<T>() + "," + GetColumnNames<Ts...>();
         }
     }
 

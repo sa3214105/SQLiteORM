@@ -38,21 +38,23 @@ namespace SQLiteHelper {
         class SelectStatement {
             const SQLiteWrapper &_sqlite;
             const Source &_source;
-            std::string _basic_sql;
             _Where _where;
             //TODO 支援express limit offset
             std::optional<std::pair<int, int> > _limitOffset;
+            bool _isDistinct;
 
         public:
             explicit SelectStatement(const SQLiteWrapper &sqlite, const Source &source,
-                                     _Where where, const std::optional<std::pair<int, int>> &limitOffset = std::nullopt) : _sqlite(sqlite),
-                _source(source), _where(where), _limitOffset(limitOffset) {
-                _basic_sql = "SELECT " + GetColumnNames<ResultColumns...>();
+                                     _Where where,
+                                     const std::optional<std::pair<int, int> > &limitOffset = std::nullopt,
+                                     bool isDistinct = false) : _sqlite(sqlite),
+                                                                _source(source), _where(where),
+                                                                _limitOffset(limitOffset), _isDistinct(isDistinct) {
             }
 
             template<ConditionConcept Cond>
             auto Where(const Cond &condition) {
-                return SelectStatement<Cond, ResultColumns...>(_sqlite, _source, condition, _limitOffset);
+                return SelectStatement<Cond, ResultColumns...>(_sqlite, _source, condition, _limitOffset, _isDistinct);
             }
 
             SelectStatement &LimitOffset(int limit, int offset = 0) {
@@ -60,9 +62,15 @@ namespace SQLiteHelper {
                 return *this;
             }
 
+            SelectStatement &Distinct() {
+                _isDistinct = true;
+                return *this;
+            }
+
             //TODO 支援迭代器模式
             std::vector<std::tuple<ResultColumns...> > Results() {
-                auto sql = _basic_sql + " FROM " + MakeSourceSQL(_source);
+                auto sql = std::string("SELECT ") + (_isDistinct ? "DISTINCT " : "") + GetColumnNames<ResultColumns
+                               ...>() + " FROM " + MakeSourceSQL(_source);
                 if constexpr (!std::is_null_pointer_v<_Where>) {
                     sql += " WHERE " + _where.condition;
                 }

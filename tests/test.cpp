@@ -9,6 +9,7 @@
 #include "TableOptionTest.hpp"
 #include "BatchInsertTest.hpp"
 #include "LimitOffsetTest.hpp"
+#include "DistinctTest.hpp"
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
