@@ -1,6 +1,6 @@
 #pragma once
 #include <gtest/gtest.h>
-#include "../src/SQLiteHelper.hpp"
+#include "../src/TypeSQlite.hpp"
 
 using namespace SQLiteHelper;
 using NameColumn = Column<"name", column_type::TEXT>;

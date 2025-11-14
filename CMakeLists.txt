@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.22)
-project(SQLiteHelper)
+project(TypeSQLite)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_library(SQLiteHelper INTERFACE)
-target_sources(SQLiteHelper INTERFACE src/SQLiteHelper.hpp)
-target_include_directories(SQLiteHelper INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+add_library(TypeSQLite INTERFACE)
+target_sources(TypeSQLite INTERFACE src/TypeSQlite.hpp)
+target_include_directories(TypeSQLite INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Coverage option and flags
 option(ENABLE_COVERAGE "Enable code coverage" OFF)
@@ -38,23 +38,23 @@ if(ENABLE_TESTS AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_subdirectory(external/googletest)
     file(GLOB_RECURSE TEST_FILES tests/*.cpp)
     list(FILTER SRC_FILES EXCLUDE REGEX "(^|[/\\])main\.cpp$")
-    add_executable(SQLiteHelper_Test ${TEST_FILES} ${SRC_FILES})
-    target_include_directories(SQLiteHelper_Test PRIVATE external/gltFX-DataTransferStruct)
-    target_include_directories(SQLiteHelper_Test PRIVATE external/EnvHelper)
-    target_link_libraries(SQLiteHelper_Test PRIVATE SQLiteHelper gtest gtest_main sqlite3_static)
+    add_executable(TypeSQLite_Test ${TEST_FILES} ${SRC_FILES})
+    target_include_directories(TypeSQLite_Test PRIVATE external/gltFX-DataTransferStruct)
+    target_include_directories(TypeSQLite_Test PRIVATE external/EnvHelper)
+    target_link_libraries(TypeSQLite_Test PRIVATE TypeSQLite gtest gtest_main sqlite3_static)
 
     # Apply coverage flags to test target
     if(ENABLE_COVERAGE)
-        target_compile_options(SQLiteHelper_Test PRIVATE --coverage -fprofile-arcs -ftest-coverage)
-        target_link_options(SQLiteHelper_Test PRIVATE --coverage)
+        target_compile_options(TypeSQLite_Test PRIVATE --coverage -fprofile-arcs -ftest-coverage)
+        target_link_options(TypeSQLite_Test PRIVATE --coverage)
     endif()
 
     enable_testing()
-    add_test(NAME SQLiteHelper_Test COMMAND SQLiteHelper_Test)
+    add_test(NAME TypeSQLite_Test COMMAND TypeSQLite_Test)
 
     # for CTest
     include(GoogleTest)
-    gtest_discover_tests(SQLiteHelper_Test)
+    gtest_discover_tests(TypeSQLite_Test)
 
     # Coverage report targets
     if(ENABLE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -65,7 +65,7 @@ if(ENABLE_TESTS AND CMAKE_BUILD_TYPE STREQUAL "Debug")
             COMMAND genhtml coverage.info.cleaned --output-directory coverage_report
             COMMAND echo "Coverage report generated in: ${CMAKE_BINARY_DIR}/coverage_report/index.html"
             WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-            DEPENDS SQLiteHelper_Test
+            DEPENDS TypeSQLite_Test
         )
         add_custom_target(coverage_clean
             COMMAND find ${CMAKE_BINARY_DIR} -name '*.gcda' -delete
