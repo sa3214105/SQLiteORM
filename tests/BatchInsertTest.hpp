@@ -42,7 +42,7 @@ TEST(BatchInsertTest, InsertManyBasic) {
 }
 
 // 測試批量插入空資料
-TEST(SQLiteHelperTest, InsertManyEmpty) {
+TEST(BatchInsertTest, InsertManyEmpty) {
     using IdColumn = Column<"id", column_type::INTEGER>;
     using TestTable = Table<"test_insert_many_empty", IdColumn, NameColumn>;
     Database<TestTable> db("test_database.db", true);
@@ -64,7 +64,7 @@ TEST(SQLiteHelperTest, InsertManyEmpty) {
 }
 
 // 測試批量插入部分欄位
-TEST(SQLiteHelperTest, InsertManyPartialColumns) {
+TEST(BatchInsertTest, InsertManyPartialColumns) {
     using IdColumn = Column<"id", column_type::INTEGER>;
     using TestTable = Table<"test_insert_many_partial", IdColumn, NameColumn, AgeColumn>;
     Database<TestTable> db("test_database.db", true);
@@ -94,7 +94,7 @@ TEST(SQLiteHelperTest, InsertManyPartialColumns) {
 }
 
 // 測試批量插入違反約束
-TEST(SQLiteHelperTest, InsertManyWithConstraintViolation) {
+TEST(BatchInsertTest, InsertManyWithConstraintViolation) {
     using IdColumn = Column<"id", column_type::INTEGER>;
     using EmailColumn = Column<"email", column_type::TEXT>;
     using TestTable = Table<"test_insert_many_constraint",
@@ -134,7 +134,7 @@ TEST(SQLiteHelperTest, InsertManyWithConstraintViolation) {
 }
 
 // 測試批量插入與單筆插入混合使用
-TEST(SQLiteHelperTest, InsertManyMixedWithSingleInsert) {
+TEST(BatchInsertTest, InsertManyMixedWithSingleInsert) {
     using IdColumn = Column<"id", column_type::INTEGER>;
     using TestTable = Table<"test_insert_many_mixed", IdColumn, NameColumn>;
     Database<TestTable> db("test_database.db", true);
@@ -177,7 +177,7 @@ TEST(SQLiteHelperTest, InsertManyMixedWithSingleInsert) {
 }
 
 // 測試批量插入效能（大量資料）
-TEST(SQLiteHelperTest, InsertManyPerformance) {
+TEST(BatchInsertTest, InsertManyPerformance) {
     using IdColumn = Column<"id", column_type::INTEGER>;
     using TestTable = Table<"test_insert_many_performance",
         IdColumn, NameColumn, AgeColumn, ScoreColumn>;
