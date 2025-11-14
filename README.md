@@ -1,6 +1,6 @@
-# SQLiteHelper
+# TypeSQLite
 
-SQLiteHelper is a simple C++ SQLite database utility that supports table definition, data insertion, query, update, and deletion, with integrated GoogleTest unit testing.
+TypeSQLite is a simple C++ SQLite database utility that supports table definition, data insertion, query, update, and deletion, with integrated GoogleTest unit testing.
 
 ## Features
 - Type-safe Table/Column definitions
@@ -14,7 +14,7 @@ SQLiteHelper is a simple C++ SQLite database utility that supports table definit
 
 ## Transaction Usage
 
-SQLiteHelper provides exception-safe transaction support:
+TypeSQLite provides exception-safe transaction support:
 
 ```cpp
 // Automatic commit (if no exception occurs)
@@ -50,7 +50,7 @@ db.CreateTransaction([&db](auto &transaction) {
 ## Build Instructions
 ```bash
 # Enter project directory
-cd SQLiteHelper
+cd TypeSQLite
 
 # Create build directory
 mkdir -p cmake-build-debug
