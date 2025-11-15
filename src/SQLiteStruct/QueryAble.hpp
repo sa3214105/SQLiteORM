@@ -3,6 +3,7 @@
 #include "DataSource.h"
 #include "Column.hpp"
 #include "Condition.hpp"
+#include "AggregateFunctions.hpp"
 
 namespace SQLiteHelper {
     template<ColumnOrTableColumnGroupConcept Columns, SourceInfoConcept Src>
@@ -23,6 +24,8 @@ namespace SQLiteHelper {
         }(p);
     } || IsQueryAble<T>::value;
 
+    template<typename T>
+    concept ResultColumnConcept = TableColumnConcept<T> || AggregateFunctionConcept<T>;
 
     template<ColumnOrTableColumnGroupConcept Columns, SourceInfoConcept Src>
     class QueryAble {
@@ -34,7 +37,7 @@ namespace SQLiteHelper {
         SQLiteWrapper &_sqlite;
         const Source _source;
 
-        template<typename _Where, TableColumnConcept... ResultColumns>
+        template<typename _Where, typename _GroupBy, ResultColumnConcept... ResultColumns>
         class SelectStatement {
             const SQLiteWrapper &_sqlite;
             const Source &_source;
@@ -54,7 +57,8 @@ namespace SQLiteHelper {
 
             template<ConditionConcept Cond>
             auto Where(const Cond &condition) {
-                return SelectStatement<Cond, ResultColumns...>(_sqlite, _source, condition, _limitOffset, _isDistinct);
+                return SelectStatement<Cond, nullptr_t, ResultColumns...>(
+                    _sqlite, _source, condition, _limitOffset, _isDistinct);
             }
 
             SelectStatement &LimitOffset(int limit, int offset = 0) {
@@ -67,12 +71,21 @@ namespace SQLiteHelper {
                 return *this;
             }
 
+            template<ColumnOrTableColumnConcept Column>
+            auto GroupBy() {
+                return SelectStatement<_Where, Column, ResultColumns...>(
+                    _sqlite, _source, _where, _limitOffset, _isDistinct);
+            }
+
             //TODO 支援迭代器模式
             std::vector<std::tuple<ResultColumns...> > Results() {
                 auto sql = std::string("SELECT ") + (_isDistinct ? "DISTINCT " : "") + GetColumnNames<ResultColumns
                                ...>() + " FROM " + MakeSourceSQL(_source);
                 if constexpr (!std::is_null_pointer_v<_Where>) {
                     sql += " WHERE " + _where.condition;
+                }
+                if constexpr (!std::is_null_pointer_v<_GroupBy>) {
+                    sql += " GROUP BY " + GetColumnName<_GroupBy>();
                 }
                 if (_limitOffset.has_value()) {
                     sql += " LIMIT " + std::to_string(_limitOffset->first);
@@ -100,11 +113,11 @@ namespace SQLiteHelper {
 
         virtual ~QueryAble() = default;
 
-        template<TableColumnConcept... ResultCol>
+        template<ResultColumnConcept... ResultCol>
         auto Select() const {
-            static_assert(IsTypeGroupSubset<TypeGroup<ResultCol...>, columns>(),
-                          "ResultCol must be subset of table columns");
-            return SelectStatement<nullptr_t, ResultCol...>(_sqlite, _source, nullptr);
+            //TODO 支援聚合暫時關閉檢查
+            //static_assert(IsTypeGroupSubset<TypeGroup<ResultCol...>, columns>(),"ResultCol must be subset of table columns");
+            return SelectStatement<nullptr_t, nullptr_t, ResultCol...>(_sqlite, _source, nullptr);
         }
 
         template<ConvertToQueryAbleConcept Table2, ConditionConcept Cond>

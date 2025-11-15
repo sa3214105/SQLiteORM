@@ -82,7 +82,8 @@ namespace SQLiteHelper {
     template<typename T>
     concept ColumnOrTableColumnGroupConcept = IsColumnOrTableColumnGroup<T>::value;
 
-    template<ColumnOrTableColumnConcept T>
+    //TODO 暫時先放寬約束
+    template<typename/*ColumnOrTableColumnConcept*/ T>
     constexpr auto GetColumnName() {
         if constexpr (TableColumnConcept<T>) {
             return T::TableType::name + FixedString(".") + T::name;
@@ -91,7 +92,8 @@ namespace SQLiteHelper {
         }
     }
 
-    template<ColumnOrTableColumnConcept T, ColumnOrTableColumnConcept... Ts>
+    //TODO 暫時先放寬約束
+    template<typename/*ColumnOrTableColumnConcept*/ T, typename/*ColumnOrTableColumnConcept*/... Ts>
     constexpr auto GetColumnNames() {
         if constexpr (sizeof...(Ts) == 0) {
             return GetColumnName<T>();
