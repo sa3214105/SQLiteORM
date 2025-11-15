@@ -1,7 +1,7 @@
 #pragma once
 #include "TableConstraint.hpp"
 
-namespace SQLiteHelper {
+namespace TypeSQLite {
     // Helper to filter only columns from a parameter pack
     template<typename... Items>
     struct FilterColumns;

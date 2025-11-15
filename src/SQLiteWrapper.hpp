@@ -5,7 +5,7 @@
 #include <memory>
 #include <filesystem>
 
-namespace SQLiteHelper {
+namespace TypeSQLite {
     //TODO Column類型不要在這邊做處理
     template<typename T>
     void bindValue(sqlite3_stmt *stmt, int index, const T &value) {

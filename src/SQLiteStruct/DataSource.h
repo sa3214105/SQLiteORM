@@ -1,6 +1,6 @@
 #pragma once
 
-namespace SQLiteHelper {
+namespace TypeSQLite {
     enum class JoinType {
         FULL,
         INNER,

@@ -2,7 +2,7 @@
 #include "Column.hpp"
 #include "../TemplateHelper/FixedString.hpp"
 
-namespace SQLiteHelper {
+namespace TypeSQLite {
     // Helper structure to pair a column with its order
     template<ColumnOrTableColumnConcept Column, OrderType order = OrderType::ASC>
     struct ColumnWithOrder {

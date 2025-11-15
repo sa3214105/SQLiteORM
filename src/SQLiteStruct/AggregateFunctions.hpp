@@ -2,7 +2,7 @@
 #include "../TemplateHelper/FixedString.hpp"
 #include "Column.hpp"
 
-namespace SQLiteHelper {
+namespace TypeSQLite {
     template<ColumnOrTableColumnConcept Col>
     struct Avg : Column<"AVG", column_type::REAL> {
         constexpr static FixedString name = FixedString("AVG(") + GetColumnName<Col>() + FixedString(")");

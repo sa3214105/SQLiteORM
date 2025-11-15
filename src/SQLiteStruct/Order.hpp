@@ -1,7 +1,7 @@
 #pragma once
 #include "../TemplateHelper/FixedString.hpp"
 
-namespace SQLiteHelper {
+namespace TypeSQLite {
     enum class OrderType {
         ASC,
         DESC

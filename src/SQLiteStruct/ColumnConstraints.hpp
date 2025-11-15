@@ -4,7 +4,7 @@
 #include "../TemplateHelper/FixedType.hpp"
 #include "../TemplateHelper/TypeGroup.hpp"
 
-namespace SQLiteHelper {
+namespace TypeSQLite {
     template<OrderType order = OrderType::ASC, ConflictCause conflictCause = ConflictCause::ABORT>
     struct ColumnPrimaryKey {
         constexpr static FixedString value = FixedString("PRIMARY KEY") + OrderTypeToString<order>() +

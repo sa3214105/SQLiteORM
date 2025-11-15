@@ -2,7 +2,7 @@
 #include "ColumnConstraints.hpp"
 #include "../TemplateHelper/FixedString.hpp"
 
-namespace SQLiteHelper {
+namespace TypeSQLite {
     enum class column_type {
         TEXT,
         NUMERIC,

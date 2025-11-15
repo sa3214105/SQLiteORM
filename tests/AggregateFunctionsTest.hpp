@@ -32,7 +32,7 @@ protected:
         std::remove("test_aggregate.db");
     }
 
-    SQLiteHelper::Database<UserTable> db{"test_aggregate.db"};
+    Database<UserTable> db{"test_aggregate.db"};
 };
 
 // 測試 COUNT 函數

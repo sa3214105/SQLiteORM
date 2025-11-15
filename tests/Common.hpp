@@ -2,7 +2,7 @@
 #include <gtest/gtest.h>
 #include "../src/TypeSQlite.hpp"
 
-using namespace SQLiteHelper;
+using namespace TypeSQLite;
 using NameColumn = Column<"name", column_type::TEXT>;
 using AgeColumn = Column<"age", column_type::INTEGER>;
 using ScoreColumn = Column<"score", column_type::REAL>;

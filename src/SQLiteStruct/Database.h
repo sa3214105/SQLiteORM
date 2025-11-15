@@ -1,6 +1,6 @@
 #pragma once
 #include "Table.hpp"
-namespace SQLiteHelper {
+namespace TypeSQLite {
     template<TableConcept... Table>
     class Database {
     public:

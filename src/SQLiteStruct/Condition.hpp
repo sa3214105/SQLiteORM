@@ -1,7 +1,7 @@
 #pragma once
 #include "Column.hpp"
 
-namespace SQLiteHelper {
+namespace TypeSQLite {
     template<typename T>
     concept IsSQLNum = std::is_integral_v<T> || std::is_floating_point_v<T>;
 

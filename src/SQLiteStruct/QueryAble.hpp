@@ -5,7 +5,7 @@
 #include "Condition.hpp"
 #include "AggregateFunctions.hpp"
 
-namespace SQLiteHelper {
+namespace TypeSQLite {
     template<ColumnOrTableColumnGroupConcept Columns, SourceInfoConcept Src>
     class QueryAble;
 
