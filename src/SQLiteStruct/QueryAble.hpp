@@ -3,6 +3,7 @@
 #include "DataSource.h"
 #include "Column.hpp"
 #include "Condition.hpp"
+#include "Expr.hpp"
 #include "AggregateFunctions.hpp"
 
 namespace TypeSQLite {
@@ -25,7 +26,7 @@ namespace TypeSQLite {
     } || IsQueryAble<T>::value;
 
     template<typename T>
-    concept ResultColumnConcept = TableColumnConcept<T> || AggregateFunctionConcept<T>;
+    concept ResultColumnConcept = ExprConcept<T>/*TableColumnConcept<T> || AggregateFunctionConcept<T>*/;
 
     template<ColumnOrTableColumnGroupConcept Columns, SourceInfoConcept Src>
     class QueryAble {
@@ -42,23 +43,31 @@ namespace TypeSQLite {
             const SQLiteWrapper &_sqlite;
             const Source &_source;
             _Where _where;
+            std::tuple<ResultColumns...> _resultColumns;
             //TODO 支援express limit offset
             std::optional<std::pair<int, int> > _limitOffset;
             bool _isDistinct;
 
+            auto GetResultColumnParamTuple() const {;
+                return std::apply([&](auto &&... columns) {
+                    return std::tuple_cat(([]<typename T>(const T &col) {
+                        return col.params;
+                    }(columns))...);
+                }, _resultColumns);
+            }
         public:
             explicit SelectStatement(const SQLiteWrapper &sqlite, const Source &source,
                                      _Where where,
-                                     const std::optional<std::pair<int, int> > &limitOffset = std::nullopt,
-                                     bool isDistinct = false) : _sqlite(sqlite),
-                                                                _source(source), _where(where),
-                                                                _limitOffset(limitOffset), _isDistinct(isDistinct) {
+                                     const std::optional<std::pair<int, int> > &limitOffset,
+                                     bool isDistinct, ResultColumns... columns) : _sqlite(sqlite),
+                _source(source), _where(where),
+                _resultColumns(columns...), _limitOffset(limitOffset), _isDistinct(isDistinct) {
             }
 
-            template<ConditionConcept Cond>
-            auto Where(const Cond &condition) {
-                return SelectStatement<Cond, nullptr_t, ResultColumns...>(
-                    _sqlite, _source, condition, _limitOffset, _isDistinct);
+            template<ExprConcept Expr>
+            auto Where(const Expr &expr) {
+                return SelectStatement<Expr, nullptr_t, ResultColumns...>(
+                    _sqlite, _source, expr, _limitOffset, _isDistinct, std::get<ResultColumns>(_resultColumns)...);
             }
 
             SelectStatement &LimitOffset(int limit, int offset = 0) {
@@ -74,15 +83,15 @@ namespace TypeSQLite {
             template<ColumnOrTableColumnConcept Column>
             auto GroupBy() {
                 return SelectStatement<_Where, Column, ResultColumns...>(
-                    _sqlite, _source, _where, _limitOffset, _isDistinct);
+                    _sqlite, _source, _where, _limitOffset, _isDistinct, std::get<ResultColumns>(_resultColumns)...);
             }
 
             //TODO 支援迭代器模式
-            std::vector<std::tuple<ResultColumns...> > Results() {
+            auto Results() {
                 auto sql = std::string("SELECT ") + (_isDistinct ? "DISTINCT " : "") + GetColumnNames<ResultColumns
                                ...>() + " FROM " + MakeSourceSQL(_source);
                 if constexpr (!std::is_null_pointer_v<_Where>) {
-                    sql += " WHERE " + _where.condition;
+                    sql += " WHERE " + _where.sql;
                 }
                 if constexpr (!std::is_null_pointer_v<_GroupBy>) {
                     sql += " GROUP BY " + GetColumnName<_GroupBy>();
@@ -95,14 +104,15 @@ namespace TypeSQLite {
                 }
                 sql += ";";
                 auto all_params = [&]() {
+                    auto basicParams = std::tuple_cat(GetResultColumnParamTuple(),ExtractSourceParams(_source));
                     if constexpr (std::is_null_pointer_v<_Where>) {
-                        return ExtractSourceParams(_source);
+                        return basicParams;
                     } else {
-                        return std::tuple_cat(ExtractSourceParams(_source), _where.params);
+                        return std::tuple_cat(basicParams, _where.params);
                     }
                 }();
                 return std::apply([this, &sql](auto &&... params) {
-                    return _sqlite.Query<ResultColumns...>(sql, params...);
+                    return _sqlite.Query<ExprResultValueType<ResultColumns>...>(sql, params...);
                 }, all_params);
             }
         };
@@ -114,57 +124,58 @@ namespace TypeSQLite {
         virtual ~QueryAble() = default;
 
         template<ResultColumnConcept... ResultCol>
-        auto Select() const {
+        auto Select(ResultCol... resultCols) const {
             //TODO 支援聚合暫時關閉檢查
             //static_assert(IsTypeGroupSubset<TypeGroup<ResultCol...>, columns>(),"ResultCol must be subset of table columns");
-            return SelectStatement<nullptr_t, nullptr_t, ResultCol...>(_sqlite, _source, nullptr);
+            return SelectStatement<nullptr_t, nullptr_t, ResultCol...>(_sqlite, _source, nullptr, std::nullopt, false,
+                                                                       resultCols...);
         }
 
-        template<ConvertToQueryAbleConcept Table2, ConditionConcept Cond>
-        auto FullJoin(const Cond &condition) const {
-            auto newSource = JoinSource(this->_source, DataSource<Table2, Cond>{
+        template<ConvertToQueryAbleConcept Table2, ExprConcept Expr>
+        auto FullJoin(const Expr &expr) const {
+            auto newSource = JoinSource(this->_source, DataSource<Table2, Expr>{
                                             .type = JoinType::FULL,
-                                            .condition = condition
+                                            .condition = expr
                                         });
             return QueryAble<typename ConcatTypeGroup<Columns, typename Table2::columns>::type, decltype(newSource)>(
                 this->_sqlite, newSource);
         }
 
-        template<ConvertToQueryAbleConcept Table2, ConditionConcept Cond>
-        auto InnerJoin(const Cond &condition) const {
-            auto newSource = JoinSource(this->_source, DataSource<Table2, Cond>{
+        template<ConvertToQueryAbleConcept Table2, ExprConcept Expr>
+        auto InnerJoin(const Expr &expr) const {
+            auto newSource = JoinSource(this->_source, DataSource<Table2, Expr>{
                                             .type = JoinType::INNER,
-                                            .condition = condition
+                                            .condition = expr
                                         });
             return QueryAble<typename ConcatTypeGroup<Columns, typename Table2::columns>::type, decltype(newSource)>(
                 this->_sqlite, newSource);
         }
 
-        template<ConvertToQueryAbleConcept Table2, ConditionConcept Cond>
-        auto LeftJoin(const Cond &condition) const {
-            auto newSource = JoinSource(this->_source, DataSource<Table2, Cond>{
+        template<ConvertToQueryAbleConcept Table2, ExprConcept Expr>
+        auto LeftJoin(const Expr &expr) const {
+            auto newSource = JoinSource(this->_source, DataSource<Table2, Expr>{
                                             .type = JoinType::LEFT,
-                                            .condition = condition
+                                            .condition = expr
                                         });
             return QueryAble<typename ConcatTypeGroup<Columns, typename Table2::columns>::type, decltype(newSource)>(
                 this->_sqlite, newSource);
         }
 
-        template<ConvertToQueryAbleConcept Table2, ConditionConcept Cond>
-        auto RightJoin(const Cond &condition) const {
-            auto newSource = JoinSource(this->_source, DataSource<Table2, Cond>{
+        template<ConvertToQueryAbleConcept Table2, ExprConcept Expr>
+        auto RightJoin(const Expr &expr) const {
+            auto newSource = JoinSource(this->_source, DataSource<Table2, Expr>{
                                             .type = JoinType::RIGHT,
-                                            .condition = condition
+                                            .condition = expr
                                         });
             return QueryAble<typename ConcatTypeGroup<Columns, typename Table2::columns>::type, decltype(newSource)>(
                 this->_sqlite, newSource);
         }
 
-        template<ConvertToQueryAbleConcept Table2, ConditionConcept Cond>
-        auto CrossJoin(const Cond &condition) const {
-            auto newSource = JoinSource(this->_source, DataSource<Table2, Cond>{
+        template<ConvertToQueryAbleConcept Table2, ExprConcept Expr>
+        auto CrossJoin(const Expr &expr) const {
+            auto newSource = JoinSource(this->_source, DataSource<Table2, Expr>{
                                             .type = JoinType::CROSS,
-                                            .condition = condition
+                                            .condition = expr
                                         });
             return QueryAble<typename ConcatTypeGroup<Columns, typename Table2::columns>::type, decltype(newSource)>(
                 this->_sqlite, newSource);

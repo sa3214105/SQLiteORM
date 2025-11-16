@@ -1,4 +1,8 @@
 #pragma once
+#include <string>
+#include <tuple>
+#include <stdexcept>
+#include <type_traits>
 
 namespace TypeSQLite {
     enum class JoinType {
@@ -78,10 +82,10 @@ namespace TypeSQLite {
     std::string MakeSourceSQL(const SourceInfo<MainSrc, Joins...> &src) {
         std::string sql = std::string(MainSrc::name);
         std::apply([&](const auto &... join) {
-            // 展開每個 JoinInfo
+            // 展開每個 JoinInfo，使用 expr.sql
             ((sql += GetJoinTypeString(join.type)
               + std::string(std::remove_cvref_t<decltype(join)>::Source::name)
-              + " ON " + join.condition.condition), ...);
+              + " ON " + std::string(join.condition.sql)), ...);
         }, src.joins);
         return sql;
     }

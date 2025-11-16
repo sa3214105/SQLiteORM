@@ -5,52 +5,52 @@
 TEST(TransactionTest, TransactionCommit) {
     Database<UserTable> db("test_database.db");
     db.CreateTransaction([&db](auto &transation) {
-        db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("TxUser"),
-                                        UserTable::MakeTableColumn<AgeColumn>(99));
+        db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>,
+            UserTable::TableColumn<AgeColumn> >("TxUser", 99);
     });
-    auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>, UserTable::TableColumn<
-                AgeColumn> >()
-            .Where(Equal<UserTable::TableColumn<NameColumn> >("TxUser")).Results();
+    auto results = db.GetTable<UserTable>().Select(UserTable::TableColumn<NameColumn>(),
+                                                   UserTable::TableColumn<AgeColumn>())
+            .Where(UserTable::TableColumn<NameColumn>() == "TxUser"_expr).Results();
     EXPECT_EQ(results.size(), 1);
-    EXPECT_EQ(std::get<UserTable::TableColumn<AgeColumn>>(results[0]).value, 99);
+    EXPECT_EQ(std::get<1>(results[0]), 99);
 }
 
 TEST(TransactionTest, TransactionRollback) {
     Database<UserTable> db("test_database.db");
     EXPECT_ANY_THROW(db.CreateTransaction([&db](auto &transation ) {
-        db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("TxRollback"), UserTable::MakeTableColumn
-            <AgeColumn>(88));
+        db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>,UserTable::TableColumn<AgeColumn>>(
+            "TxRollback",88);
         throw std::runtime_error("Force rollback");
         }));
-    auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>, UserTable::TableColumn<
-                AgeColumn> >()
-            .Where(Equal<UserTable::TableColumn<NameColumn> >("TxRollback")).Results();
+    auto results = db.GetTable<UserTable>().Select(UserTable::TableColumn<NameColumn>(), UserTable::TableColumn<
+                                                       AgeColumn>())
+            .Where(UserTable::TableColumn<NameColumn>() == "TxRollback"_expr).Results();
     EXPECT_EQ(results.size(), 0);
 }
 
 TEST(TransactionTest, TransactionExplicitCommit) {
     Database<UserTable> db("test_database.db");
     db.CreateTransaction([&db](auto &transaction) {
-        db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("ExplicitCommit"),
-                                        UserTable::MakeTableColumn<AgeColumn>(77));
+        db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>, UserTable::TableColumn<AgeColumn> >(
+            "ExplicitCommit", 77);
         transaction.Commit(); // 明確呼叫 Commit
     });
-    auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>, UserTable::TableColumn<
-                AgeColumn> >()
-            .Where(Equal<UserTable::TableColumn<NameColumn> >("ExplicitCommit")).Results();
+    auto results = db.GetTable<UserTable>().Select(UserTable::TableColumn<NameColumn>(),
+                                                   UserTable::TableColumn<AgeColumn>())
+            .Where(UserTable::TableColumn<NameColumn>() == "ExplicitCommit"_expr).Results();
     EXPECT_EQ(results.size(), 1);
-    EXPECT_EQ(std::get<UserTable::TableColumn<AgeColumn>>(results[0]).value, 77);
+    EXPECT_EQ(std::get<1>(results[0]), 77);
 }
 
 TEST(TransactionTest, TransactionExplicitRollback) {
     Database<UserTable> db("test_database.db");
     db.CreateTransaction([&db](auto &transaction) {
-        db.GetTable<UserTable>().Insert(UserTable::MakeTableColumn<NameColumn>("ExplicitRollback"),
-                                        UserTable::MakeTableColumn<AgeColumn>(66));
+        db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>, UserTable::TableColumn<AgeColumn> >(
+            "ExplicitRollback", 66);
         transaction.Rollback(); // 明確呼叫 Rollback
     });
-    auto results = db.GetTable<UserTable>().Select<UserTable::TableColumn<NameColumn>, UserTable::TableColumn<
-                AgeColumn> >()
-            .Where(Equal<UserTable::TableColumn<NameColumn> >("ExplicitRollback")).Results();
+    auto results = db.GetTable<UserTable>().Select(UserTable::TableColumn<NameColumn>(), UserTable::TableColumn<
+                AgeColumn>())
+            .Where(UserTable::TableColumn<NameColumn>() == "ExplicitRollback"_expr).Results();
     EXPECT_EQ(results.size(), 0);
 }

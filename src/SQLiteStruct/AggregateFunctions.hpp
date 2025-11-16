@@ -1,111 +1,65 @@
 #pragma once
 #include "../TemplateHelper/FixedString.hpp"
-#include "Column.hpp"
+#include "Expr.hpp"
 
 namespace TypeSQLite {
-    template<ColumnOrTableColumnConcept Col>
-    struct Avg : Column<"AVG", column_type::REAL> {
-        constexpr static FixedString name = FixedString("AVG(") + GetColumnName<Col>() + FixedString(")");
-    };
+    // AVG - Average value
+    template<ExprConcept T>
+    auto Avg(const T &expr) {
+        return MakeExprWithOneOperands<"AVG(" + T::sql + ")">(expr);
+    }
 
-    template<ColumnOrTableColumnConcept Col>
-    struct Count : Column<"COUNT", column_type::INTEGER> {
-        constexpr static FixedString name = FixedString("COUNT(") + GetColumnName<Col>() + FixedString(")");
-        constexpr static column_type type = column_type::INTEGER;
-        using ValueType = int;
-        ValueType value;
-    };
+    // COUNT - Count rows
+    template<ExprConcept T>
+    auto Count(const T &expr) {
+        return MakeExprWithOneOperands<"COUNT(" + T::sql + ")">(expr);
+    }
 
-    template<ColumnOrTableColumnConcept Col1, ColumnOrTableColumnConcept Col2>
-    struct GroupConcat : Column<"GROUP_CONCAT", column_type::TEXT> {
-        constexpr static FixedString name = FixedString("GROUP_CONCAT(") + GetColumnName<Col1>() + FixedString(", ")
-                                            + GetColumnName<Col2>() + FixedString(")");
-        constexpr static column_type type = column_type::TEXT;
-        using ValueType = std::string;
-        ValueType value;
-    };
+    // MAX - Maximum value
+    template<ExprConcept T>
+    auto Max(const T &expr) {
+        return MakeExprWithOneOperands<"MAX(" + T::sql + ")">(expr);
+    }
 
-    template<ColumnOrTableColumnConcept Col>
-    struct Max : Column<"MAX", column_type::REAL> {
-        constexpr static FixedString name = FixedString("MAX(") + GetColumnName<Col>() + FixedString(")");
-    };
+    // MIN - Minimum value
+    template<ExprConcept T>
+    auto Min(const T &expr) {
+        return MakeExprWithOneOperands<"MIN(" + T::sql + ")">(expr);
+    }
 
-    template<ColumnOrTableColumnConcept Col>
-    struct Median : Column<"MAX", column_type::REAL> {
-        constexpr static FixedString name = FixedString("MEDIAN(") + GetColumnName<Col>() + FixedString(")");
-    };
+    // SUM - Sum of values
+    template<ExprConcept T>
+    auto Sum(const T &expr) {
+        return MakeExprWithOneOperands<"SUM(" + T::sql + ")">(expr);
+    }
 
-    template<ColumnOrTableColumnConcept Col>
-    struct Min : Column<"MAX", column_type::REAL> {
-        constexpr static FixedString name = FixedString("MIN(") + GetColumnName<Col>() + FixedString(")");
-    };
+    // TOTAL - Total of values (returns 0.0 for empty set instead of NULL)
+    template<ExprConcept T>
+    auto Total(const T &expr) {
+        return MakeExprWithOneOperands<"TOTAL(" + T::sql + ")">(expr);
+    }
 
-    template<ColumnOrTableColumnConcept Col, double percent>
-    struct Percentile: Column<"PERCENT", column_type::REAL> {
-        constexpr static FixedString name = FixedString("PERCENTILE(") + GetColumnName<Col>() + FixedString(", ") +
-                                            toFixedString<percent> + FixedString(")");
-    };
+    // GROUP_CONCAT - Concatenate strings with separator
+    template<ExprConcept T1, ExprConcept T2>
+    auto GroupConcat(const T1 &expr1, const T2 &expr2) {
+        return MakeExprWithTwoOperands<"GROUP_CONCAT(" + T1::sql + ", " + T2::sql + ")">(expr1, expr2);
+    }
 
-    template<ColumnOrTableColumnConcept Col, double percent>
-    struct PercentileCont: Column<"PERCENT", column_type::REAL> {
-        constexpr static FixedString name = FixedString("PERCENTILE_CONT(") + GetColumnName<Col>() + FixedString(", ") +
-                                            toFixedString<percent> + FixedString(")");
-    };
+    // MEDIAN - Median value
+    template<ExprConcept T>
+    auto Median(const T &expr) {
+        return MakeExprWithOneOperands<"MEDIAN(" + T::sql + ")">(expr);
+    }
 
-    template<ColumnOrTableColumnConcept Col>
-    struct Sum: Column<"PERCENT", column_type::REAL> {
-        constexpr static FixedString name = FixedString("SUM(") + GetColumnName<Col>() + FixedString(")");
-    };
+    // PERCENTILE - Percentile value
+    template<double percent, ExprConcept T>
+    auto Percentile(const T &expr) {
+        return MakeExprWithOneOperands<"PERCENTILE(" + T::sql + ", " + toFixedString<percent>() + ")">(expr);
+    }
 
-    template<ColumnOrTableColumnConcept Col>
-    struct Total: Column<"PERCENT", column_type::REAL> {
-        constexpr static FixedString name = FixedString("TOTAL(") + GetColumnName<Col>() + FixedString(")");
-    };
-
-    template<typename>
-    struct IsAggregateFunction : std::false_type {
-    };
-
-    template<ColumnOrTableColumnConcept Column>
-    struct IsAggregateFunction<Avg<Column> > : std::true_type {
-    };
-
-    template<ColumnOrTableColumnConcept Column>
-    struct IsAggregateFunction<Count<Column> > : std::true_type {
-    };
-
-    template<ColumnOrTableColumnConcept Column1, ColumnOrTableColumnConcept Column2>
-    struct IsAggregateFunction<GroupConcat<Column1, Column2> > : std::true_type {
-    };
-
-    template<ColumnOrTableColumnConcept Column>
-    struct IsAggregateFunction<Max<Column> > : std::true_type {
-    };
-
-    template<ColumnOrTableColumnConcept Column>
-    struct IsAggregateFunction<Min<Column> > : std::true_type {
-    };
-
-    template<ColumnOrTableColumnConcept Column>
-    struct IsAggregateFunction<Median<Column> > : std::true_type {
-    };
-
-    template<ColumnOrTableColumnConcept Column, double percent>
-    struct IsAggregateFunction<Percentile<Column, percent> > : std::true_type {
-    };
-
-    template<ColumnOrTableColumnConcept Column, double percent>
-    struct IsAggregateFunction<PercentileCont<Column, percent> > : std::true_type {
-    };
-
-    template<ColumnOrTableColumnConcept Column>
-    struct IsAggregateFunction<Sum<Column> > : std::true_type {
-    };
-
-    template<ColumnOrTableColumnConcept Column>
-    struct IsAggregateFunction<Total<Column> > : std::true_type {
-    };
-
-    template<typename T>
-    concept AggregateFunctionConcept = IsAggregateFunction<T>::value;
+    // PERCENTILE_CONT - Continuous percentile value
+    template<double percent, ExprConcept T>
+    auto PercentileCont(const T &expr) {
+        return MakeExprWithOneOperands<"PERCENTILE_CONT(" + T::sql + ", " + toFixedString<percent>() + ")">(expr);
+    }
 }

@@ -9,5 +9,4 @@
 #include "SQLiteStruct/Table.hpp"
 #include "SQliteStruct/Database.h"
 #include "SQLiteWrapper.hpp"
-
-
+#include "SQLiteStruct/Expr.hpp"

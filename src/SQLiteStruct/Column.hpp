@@ -1,51 +1,42 @@
 #pragma once
 #include "ColumnConstraints.hpp"
 #include "../TemplateHelper/FixedString.hpp"
+#include "Expr.hpp"
 
 namespace TypeSQLite {
-    enum class column_type {
-        TEXT,
-        NUMERIC,
-        INTEGER,
-        REAL,
-        BLOB
-    };
-
-    template<column_type type>
+    template<ExprResultType type>
     constexpr auto ColumnTypeToString() {
         switch (type) {
-            case column_type::TEXT:
+            case ExprResultType::TEXT:
                 return "TEXT";
-            case column_type::NUMERIC:
+            case ExprResultType::NUMERIC:
                 return "NUMERIC";
-            case column_type::INTEGER:
+            case ExprResultType::INTEGER:
                 return "INTEGER";
-            case column_type::REAL:
+            case ExprResultType::REAL:
                 return "REAL";
-            case column_type::BLOB:
+            case ExprResultType::BLOB:
                 return "BLOB";
             default:
                 return "UNKNOWN";
         }
     }
 
-    template<FixedString Name, column_type Type, ColumnConstraintConcept... Constraints>
-    struct Column {
+    template<FixedString Name, ExprResultType Type, ColumnConstraintConcept... Constraints>
+    struct Column : Expr<TypeGroup<Column<Name, Type, Constraints...> >, Type, Name> {
         constexpr static FixedString name = Name;
-        constexpr static column_type type = Type;
+        constexpr static FixedString sql = Name;
+        constexpr static ExprResultType resultType = Type;
+        constexpr static ExprResultType type = Type;
+        using columns = TypeGroup<Column>;
         using constraints = TypeGroup<Constraints...>;
-        std::conditional_t<Type == column_type::TEXT, std::string,
-            std::conditional_t<Type == column_type::NUMERIC, double,
-                std::conditional_t<Type == column_type::INTEGER, int,
-                    std::conditional_t<Type == column_type::REAL, double,
-                        std::vector<uint8_t> > > > > value;
     };
 
     template<typename>
     struct IsColumn : std::false_type {
     };
 
-    template<FixedString Name, column_type Type, typename... Constraints>
+    template<FixedString Name, ExprResultType Type, typename... Constraints>
     struct IsColumn<Column<Name, Type, Constraints...> > : std::true_type {
     };
 
@@ -55,6 +46,7 @@ namespace TypeSQLite {
     template<typename T, ColumnConcept U>
     struct TableColumn_Base : U {
         using TableType = T;
+        constexpr static FixedString sql = T::name + FixedString(".") + U::name;
     };
 
     template<typename>
@@ -85,11 +77,12 @@ namespace TypeSQLite {
     //TODO 暫時先放寬約束
     template<typename/*ColumnOrTableColumnConcept*/ T>
     constexpr auto GetColumnName() {
-        if constexpr (TableColumnConcept<T>) {
-            return T::TableType::name + FixedString(".") + T::name;
-        } else {
-            return T::name;
-        }
+        return T::sql;
+        // if constexpr (TableColumnConcept<T>) {
+        //     return T::TableType::name + FixedString(".") + T::name;
+        // } else {
+        //     return T::name;
+        // }
     }
 
     //TODO 暫時先放寬約束

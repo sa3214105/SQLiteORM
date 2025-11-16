@@ -3,12 +3,12 @@
 #include "../src/TypeSQlite.hpp"
 
 using namespace TypeSQLite;
-using NameColumn = Column<"name", column_type::TEXT>;
-using AgeColumn = Column<"age", column_type::INTEGER>;
-using ScoreColumn = Column<"score", column_type::REAL>;
-using DeptColumn = Column<"dept", column_type::TEXT>;
-using CityColumn = Column<"city", column_type::TEXT>;
-using CountryColumn = Column<"country", column_type::TEXT>;
+using NameColumn = Column<"name", ExprResultType::TEXT>;
+using AgeColumn = Column<"age", ExprResultType::INTEGER>;
+using ScoreColumn = Column<"score", ExprResultType::REAL>;
+using DeptColumn = Column<"dept", ExprResultType::TEXT>;
+using CityColumn = Column<"city", ExprResultType::TEXT>;
+using CountryColumn = Column<"country", ExprResultType::TEXT>;
 
 // 定義表類型
 using UserTable = Table<"users", NameColumn, AgeColumn, ScoreColumn>;

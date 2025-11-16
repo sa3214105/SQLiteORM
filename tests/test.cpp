@@ -11,6 +11,7 @@
 #include "LimitOffsetTest.hpp"
 #include "DistinctTest.hpp"
 #include "AggregateFunctionsTest.hpp"
+#include "ExprTest.hpp"
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
