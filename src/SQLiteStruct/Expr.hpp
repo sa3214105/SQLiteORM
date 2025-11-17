@@ -241,4 +241,22 @@ namespace TypeSQLite {
             return Expr<newCols, ExprResultType::NUMERIC, newSQL, std::remove_cvref_t<decltype(para)>...>(para...);
         }, newPara);
     }
+
+    template<ExprConcept expr, ExprConcept... exprs>
+    auto MakeExprList(const expr &first, const exprs &... rest) {
+        if constexpr (sizeof...(rest) == 0) {
+            return first.sql;
+        } else {
+            return MakeExprWithTwoOperands<first.sql + ", " + MakeExprList(rest...).sql>(first, MakeExprList(rest...));
+        }
+    }
+
+    template<ExprConcept expr, ExprConcept... exprs>
+    auto GetExprParamTuple(const expr &first, const exprs &... rest) {
+        if constexpr (sizeof...(rest) == 0) {
+            return first.params;
+        } else {
+            return std::tuple_cat(first.params, GetExprParamTuple(rest...));
+        }
+    }
 }

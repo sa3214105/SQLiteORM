@@ -1,4 +1,6 @@
 #pragma once
+#include <cmath>
+
 #include "../SQLiteWrapper.hpp"
 #include "DataSource.h"
 #include "Column.hpp"
@@ -43,31 +45,42 @@ namespace TypeSQLite {
             const SQLiteWrapper &_sqlite;
             const Source &_source;
             _Where _where;
+            _GroupBy _groupBy;
             std::tuple<ResultColumns...> _resultColumns;
             //TODO 支援express limit offset
             std::optional<std::pair<int, int> > _limitOffset;
             bool _isDistinct;
 
-            auto GetResultColumnParamTuple() const {;
+            auto GetResultColumnParamTuple() const {
+                ;
                 return std::apply([&](auto &&... columns) {
                     return std::tuple_cat(([]<typename T>(const T &col) {
                         return col.params;
                     }(columns))...);
                 }, _resultColumns);
             }
+
         public:
-            explicit SelectStatement(const SQLiteWrapper &sqlite, const Source &source,
-                                     _Where where,
-                                     const std::optional<std::pair<int, int> > &limitOffset,
-                                     bool isDistinct, ResultColumns... columns) : _sqlite(sqlite),
-                _source(source), _where(where),
-                _resultColumns(columns...), _limitOffset(limitOffset), _isDistinct(isDistinct) {
+            explicit SelectStatement(
+                const SQLiteWrapper &sqlite,
+                const Source &source,
+                _Where where,
+                _GroupBy groupBy,
+                const std::optional<std::pair<int, int> > &limitOffset,
+                bool isDistinct, ResultColumns... columns) : _sqlite(sqlite),
+                                                             _source(source),
+                                                             _where(where),
+                                                             _groupBy(groupBy),
+                                                             _resultColumns(columns...),
+                                                             _limitOffset(limitOffset),
+                                                             _isDistinct(isDistinct) {
             }
 
             template<ExprConcept Expr>
             auto Where(const Expr &expr) {
-                return SelectStatement<Expr, nullptr_t, ResultColumns...>(
-                    _sqlite, _source, expr, _limitOffset, _isDistinct, std::get<ResultColumns>(_resultColumns)...);
+                return SelectStatement<Expr, _GroupBy, ResultColumns...>(
+                    _sqlite, _source, expr, _groupBy, _limitOffset, _isDistinct,
+                    std::get<ResultColumns>(_resultColumns)...);
             }
 
             SelectStatement &LimitOffset(int limit, int offset = 0) {
@@ -80,10 +93,11 @@ namespace TypeSQLite {
                 return *this;
             }
 
-            template<ColumnOrTableColumnConcept Column>
-            auto GroupBy() {
-                return SelectStatement<_Where, Column, ResultColumns...>(
-                    _sqlite, _source, _where, _limitOffset, _isDistinct, std::get<ResultColumns>(_resultColumns)...);
+            template<ExprConcept... Exprs>
+            auto GroupBy(Exprs... exprs) {
+                return SelectStatement<_Where, std::tuple<Exprs...>, ResultColumns...>(
+                    _sqlite, _source, _where, std::make_tuple(exprs...), _limitOffset, _isDistinct,
+                    std::get<ResultColumns>(_resultColumns)...);
             }
 
             //TODO 支援迭代器模式
@@ -94,7 +108,8 @@ namespace TypeSQLite {
                     sql += " WHERE " + _where.sql;
                 }
                 if constexpr (!std::is_null_pointer_v<_GroupBy>) {
-                    sql += " GROUP BY " + GetColumnName<_GroupBy>();
+                    auto xx = std::apply([](auto &&... expr){ return MakeExprList(expr...);}, _groupBy);
+                    sql += " GROUP BY " + xx;
                 }
                 if (_limitOffset.has_value()) {
                     sql += " LIMIT " + std::to_string(_limitOffset->first);
@@ -104,11 +119,19 @@ namespace TypeSQLite {
                 }
                 sql += ";";
                 auto all_params = [&]() {
-                    auto basicParams = std::tuple_cat(GetResultColumnParamTuple(),ExtractSourceParams(_source));
+                    auto basicParams = std::tuple_cat(GetResultColumnParamTuple(), ExtractSourceParams(_source));
                     if constexpr (std::is_null_pointer_v<_Where>) {
-                        return basicParams;
+                        if constexpr (std::is_null_pointer_v<_GroupBy>) {
+                            return basicParams;
+                        } else {
+                            return std::tuple_cat(basicParams, std::apply([](auto &&... expr){return GetExprParamTuple(expr...);}, _groupBy));
+                        }
                     } else {
-                        return std::tuple_cat(basicParams, _where.params);
+                        if constexpr (std::is_null_pointer_v<_GroupBy>) {
+                            return std::tuple_cat(basicParams, _where.params);
+                        } else {
+                            return std::tuple_cat(basicParams, _where.params, std::apply([](auto &&... expr){return GetExprParamTuple(expr...);}, _groupBy));
+                        }
                     }
                 }();
                 return std::apply([this, &sql](auto &&... params) {
@@ -127,7 +150,8 @@ namespace TypeSQLite {
         auto Select(ResultCol... resultCols) const {
             //TODO 支援聚合暫時關閉檢查
             //static_assert(IsTypeGroupSubset<TypeGroup<ResultCol...>, columns>(),"ResultCol must be subset of table columns");
-            return SelectStatement<nullptr_t, nullptr_t, ResultCol...>(_sqlite, _source, nullptr, std::nullopt, false,
+            return SelectStatement<nullptr_t, nullptr_t, ResultCol...>(_sqlite, _source, nullptr, nullptr, std::nullopt,
+                                                                       false,
                                                                        resultCols...);
         }
 

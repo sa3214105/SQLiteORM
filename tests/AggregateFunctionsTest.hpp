@@ -132,7 +132,7 @@ TEST_F(AggregateFunctionTest, GroupBySingleColumn) {
     auto results = db.GetTable<UserTable>().Select(
         UserTable::TableColumn<AgeColumn>(),
         Count(UserTable::TableColumn<NameColumn>())
-    ).GroupBy<UserTable::TableColumn<AgeColumn>>().Results();
+    ).GroupBy(UserTable::TableColumn<AgeColumn>()).Results();
 
     ASSERT_EQ(results.size(), 3); // 3 個不同的年齡組
 
@@ -155,7 +155,7 @@ TEST_F(AggregateFunctionTest, GroupByWithMultipleAggregates) {
         Avg(UserTable::TableColumn<ScoreColumn>()),
         Min(UserTable::TableColumn<ScoreColumn>()),
         Max(UserTable::TableColumn<ScoreColumn>())
-    ).GroupBy<UserTable::TableColumn<AgeColumn>>().Results();
+    ).GroupBy(UserTable::TableColumn<AgeColumn>()).Results();
 
     ASSERT_EQ(results.size(), 3);
 
@@ -186,7 +186,7 @@ TEST_F(AggregateFunctionTest, GroupByWithWhere) {
         Count(UserTable::TableColumn<NameColumn>()),
         Avg(UserTable::TableColumn<ScoreColumn>())
     ).Where(UserTable::TableColumn<ScoreColumn>() > 80.0_expr)
-     .GroupBy<UserTable::TableColumn<AgeColumn>>()
+     .GroupBy(UserTable::TableColumn<AgeColumn>())
      .Results();
 
     // 只有 score > 80 的記錄: Alice(25, 85.5), Bob(30, 92.0), David(35, 88.0)
@@ -211,7 +211,7 @@ TEST_F(AggregateFunctionTest, SumWithGroupBy) {
     auto results = db.GetTable<UserTable>().Select(
         UserTable::TableColumn<AgeColumn>(),
         Sum(UserTable::TableColumn<ScoreColumn>())
-    ).GroupBy<UserTable::TableColumn<AgeColumn>>().Results();
+    ).GroupBy(UserTable::TableColumn<AgeColumn>()).Results();
 
     ASSERT_EQ(results.size(), 3);
 
@@ -383,7 +383,7 @@ TEST_F(AggregateFunctionTest, GroupByWithLimit) {
     auto results = db.GetTable<UserTable>().Select(
         UserTable::TableColumn<AgeColumn>(),
         Count(UserTable::TableColumn<NameColumn>())
-    ).GroupBy<UserTable::TableColumn<AgeColumn>>().LimitOffset(2).Results();
+    ).GroupBy(UserTable::TableColumn<AgeColumn>()).LimitOffset(2).Results();
 
     ASSERT_EQ(results.size(), 2); // 限制只返回 2 組
 }
@@ -393,7 +393,7 @@ TEST_F(AggregateFunctionTest, GroupByWithLimitOffset) {
     auto results = db.GetTable<UserTable>().Select(
         UserTable::TableColumn<AgeColumn>(),
         Count(UserTable::TableColumn<NameColumn>())
-    ).GroupBy<UserTable::TableColumn<AgeColumn>>().LimitOffset(1, 1).Results();
+    ).GroupBy(UserTable::TableColumn<AgeColumn>()).LimitOffset(1, 1).Results();
 
     ASSERT_EQ(results.size(), 1); // 跳過第一組，只返回 1 組
 }
@@ -408,7 +408,7 @@ TEST_F(AggregateFunctionTest, ComplexAggregateQuery) {
         Min(UserTable::TableColumn<ScoreColumn>()),
         Max(UserTable::TableColumn<ScoreColumn>())
     ).Where(UserTable::TableColumn<ScoreColumn>() > 75_expr)
-     .GroupBy<UserTable::TableColumn<AgeColumn>>()
+     .GroupBy(UserTable::TableColumn<AgeColumn>())
      .Results();
 
     ASSERT_GT(results.size(), 0);
@@ -426,7 +426,7 @@ TEST_F(AggregateFunctionTest, TotalWithGroupBy) {
     auto results = db.GetTable<UserTable>().Select(
         UserTable::TableColumn<AgeColumn>(),
         Total(UserTable::TableColumn<ScoreColumn>())
-    ).GroupBy<UserTable::TableColumn<AgeColumn>>().Results();
+    ).GroupBy(UserTable::TableColumn<AgeColumn>()).Results();
 
     ASSERT_EQ(results.size(), 3);
 
@@ -448,7 +448,7 @@ TEST_F(AggregateFunctionTest, GroupByOnEmptyTable) {
     auto results = db.GetTable<UserTable>().Select(
         UserTable::TableColumn<AgeColumn>(),
         Count(UserTable::TableColumn<NameColumn>())
-    ).GroupBy<UserTable::TableColumn<AgeColumn>>().Results();
+    ).GroupBy(UserTable::TableColumn<AgeColumn>()).Results();
 
     ASSERT_EQ(results.size(), 0); // 空表應該返回空結果
 }
@@ -463,7 +463,7 @@ TEST_F(AggregateFunctionTest, AllAggregateFunctionsWithGroupBy) {
         Min(UserTable::TableColumn<ScoreColumn>()),
         Max(UserTable::TableColumn<ScoreColumn>()),
         Total(UserTable::TableColumn<ScoreColumn>())
-    ).GroupBy<UserTable::TableColumn<AgeColumn>>().Results();
+    ).GroupBy(UserTable::TableColumn<AgeColumn>()).Results();
 
     ASSERT_EQ(results.size(), 3);
 
