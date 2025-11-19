@@ -1,6 +1,9 @@
+// cpp
 #pragma once
 #include <tuple>
 #include <type_traits>
+#include <concepts>
+#include <string>
 #include "src/TemplateHelper/FixedString.hpp"
 
 namespace TypeSQLite {
@@ -12,23 +15,19 @@ namespace TypeSQLite {
         BLOB
     };
 
-    template<typename cols, ExprResultType exprResultType, FixedString partialSQL, typename...
-        parameters>
+    template<ExprResultType exprResultType, typename Columns, typename Parameters>
     struct Expr {
-        constexpr static FixedString sql = partialSQL;
         constexpr static ExprResultType resultType = exprResultType;
-        using columns = cols;
-        std::tuple<parameters...> params;
-
-        explicit Expr(parameters... params) : params(std::forward<parameters>(params)...) {
-        }
+        const Columns cols;
+        const std::string sql;
+        const Parameters params;
     };
 
     template<typename T>
     struct IsExprBase {
     private:
-        template<typename cols, ExprResultType r, FixedString s, typename... P>
-        static std::true_type test(const Expr<cols, r, s, P...> *) { return {}; }
+        template<ExprResultType exprResultType, typename Columns, typename Parameters>
+        static std::true_type test(const Expr<exprResultType, Columns, Parameters> *) { return {}; }
 
         static std::false_type test(...) { return {}; }
 
@@ -37,9 +36,15 @@ namespace TypeSQLite {
     };
 
     template<typename T>
-    concept ExprConcept = IsExprBase<T>::value;
+    concept ExprConcept = requires(T t)
+    {
+        // { T::resultType } -> std::same_as<ExprResultType>;
+        { t.sql } -> std::convertible_to<std::string>;
+        // { std::tuple_size<decltype(t.cols)>::value } -> std::convertible_to<std::size_t>;
+        // { std::tuple_size<decltype(t.params)>::value } -> std::convertible_to<std::size_t>;
+    };
 
-    template<ExprConcept expr>
+    template<typename expr>
     using ExprResultValueType = std::conditional_t<expr::resultType == ExprResultType::TEXT, std::string,
         std::conditional_t<expr::resultType == ExprResultType::NUMERIC, double,
             std::conditional_t<expr::resultType == ExprResultType::INTEGER, int,
@@ -48,198 +53,209 @@ namespace TypeSQLite {
 
     // sqlite literal
     inline auto operator""_expr(const char *str, size_t) {
-        return Expr<TypeGroup<>, ExprResultType::TEXT, "?", std::string>(std::string(str));
+        return Expr<ExprResultType::TEXT, std::tuple<>, std::tuple<std::string> >{
+            .cols = std::tuple<>{},
+            .sql = "?",
+            .params = std::make_tuple(std::string(str))
+        };
     }
 
     inline auto operator""_expr(const long double value) {
-        return Expr<TypeGroup<>, ExprResultType::NUMERIC, "?", double>(static_cast<double>(value));
+        return Expr<ExprResultType::NUMERIC, std::tuple<>, std::tuple<double> >{
+            .cols = std::tuple<>{},
+            .sql = "?",
+            .params = std::make_tuple(static_cast<double>(value))
+        };
     }
 
     inline auto operator""_expr(const unsigned long long value) {
-        return Expr<TypeGroup<>, ExprResultType::NUMERIC, "?", int>(static_cast<int>(value));
+        return Expr<ExprResultType::NUMERIC, std::tuple<>, std::tuple<double> >{
+            .cols = std::tuple<>{},
+            .sql = "?",
+            .params = std::make_tuple(static_cast<double>(value))
+        };
     }
 
     // sqlite one operand operators
-    template<FixedString newSQL, ExprConcept T>
-    auto MakeExprWithOneOperands(const T &expr) {
-        return std::apply([&](auto... para) {
-            return Expr<typename T::columns, ExprResultType::NUMERIC, newSQL, std::remove_cvref_t<decltype(para)>
-                ...>(para...);
-        }, expr.params);
+    template<ExprConcept T>
+    auto MakeExprWithOneOperands(const std::string &newSQL, const T expr) {
+        return Expr<ExprResultType::NUMERIC, decltype(expr.cols), decltype(expr.params)>{
+            .cols = expr.cols,
+            .sql = newSQL,
+            .params = expr.params
+        };
     }
 
     template<ExprConcept expr>
     auto operator-(const expr &e) {
-        return MakeExprWithOneOperands<"-(" + expr::sql + ")">(e);
+        return MakeExprWithOneOperands("-(" + e.sql + ")", e);
     }
 
     template<ExprConcept expr>
     auto operator+(const expr &e) {
-        return MakeExprWithOneOperands<"+(" + expr::sql + ")">(e);
+        return MakeExprWithOneOperands("+(" + e.sql + ")", e);
     }
 
     template<ExprConcept expr>
     auto operator!(const expr &e) {
-        return MakeExprWithOneOperands<"NOT (" + expr::sql + ")">(e);
+        return MakeExprWithOneOperands("NOT (" + e.sql + ")", e);
     }
 
     template<ExprConcept expr>
     auto operator~(const expr &e) {
-        return MakeExprWithOneOperands<"~ (" + expr::sql + ")">(e);
+        return MakeExprWithOneOperands("~ (" + e.sql + ")", e);
+    }
+
+    template<ExprConcept expr>
+    auto Brackets(const expr &e) {
+        return MakeExprWithOneOperands("(" + e.sql + ")", e);
     }
 
     // sqlite two operand operators
-    template<FixedString newSQL, ExprConcept lhs, ExprConcept rhs>
-    auto MakeExprWithTwoOperands(const lhs &left, const rhs &right) {
-        using newCols = ConcatTypeGroup<typename lhs::columns, typename rhs::columns>::type;
+    template<ExprConcept lhs, ExprConcept rhs>
+    auto MakeExprWithTwoOperands(std::string newSQL,const lhs &left, const rhs &right) {
+        auto newCols = std::tuple_cat(left.cols, right.cols);
         auto newPara = std::tuple_cat(left.params, right.params);
-        return std::apply([&](auto... para) {
-            return Expr<newCols, ExprResultType::NUMERIC, newSQL, std::remove_cvref_t<decltype(para)>...>(para...);
-        }, newPara);
+        return Expr<ExprResultType::NUMERIC, decltype(newCols), decltype(newPara)>{
+            .cols = newCols,
+            .sql = newSQL,
+            .params = newPara
+        };
     }
 
 
     template<ExprConcept lhs, ExprConcept rhs>
     auto operator+(const lhs &left, const rhs &right) {
-        return MakeExprWithTwoOperands<lhs::sql + " + " + rhs::sql>(left, right);
+        return MakeExprWithTwoOperands(left.sql + " + " + right.sql, left, right);
     }
 
     template<ExprConcept lhs, ExprConcept rhs>
     auto operator-(const lhs &left, const rhs &right) {
-        return MakeExprWithTwoOperands<lhs::sql + " - " + rhs::sql>(left, right);
+        return MakeExprWithTwoOperands(left.sql + " - " + right.sql, left, right);
     }
 
     template<ExprConcept lhs, ExprConcept rhs>
     auto operator*(const lhs &left, const rhs &right) {
-        return MakeExprWithTwoOperands<lhs::sql + " * " + rhs::sql>(left, right);
+        return MakeExprWithTwoOperands(left.sql + " * " + right.sql, left, right);
     }
 
     template<ExprConcept lhs, ExprConcept rhs>
     auto operator/(const lhs &left, const rhs &right) {
-        return MakeExprWithTwoOperands<lhs::sql + " / " + rhs::sql>(left, right);
+        return MakeExprWithTwoOperands(left.sql + " / " + right.sql, left, right);
     }
 
     template<ExprConcept lhs, ExprConcept rhs>
     auto operator%(const lhs &left, const rhs &right) {
-        return MakeExprWithTwoOperands<lhs::sql + " % " + rhs::sql>(left, right);
+        return MakeExprWithTwoOperands(left.sql + " % " + right.sql, left, right);
     }
 
     template<ExprConcept lhs, ExprConcept rhs>
     auto operator^(const lhs &left, const rhs &right) {
-        return MakeExprWithTwoOperands<lhs::sql + " ^ " + rhs::sql>(left, right);
+        return MakeExprWithTwoOperands(left.sql + " ^ " + right.sql, left, right);
     }
 
     template<ExprConcept lhs, ExprConcept rhs>
     auto operator&&(const lhs &left, const rhs &right) {
-        return MakeExprWithTwoOperands<"(" + lhs::sql + ") AND (" + rhs::sql + ")">(left, right);
+        return MakeExprWithTwoOperands("(" + left.sql + ") AND (" + right.sql + ")", left, right);
     }
 
     template<ExprConcept lhs, ExprConcept rhs>
     auto operator||(const lhs &left, const rhs &right) {
-        return MakeExprWithTwoOperands<"(" + lhs::sql + ") OR (" + rhs::sql + ")">(left, right);
+        return MakeExprWithTwoOperands("(" + left.sql + ") OR (" + right.sql + ")", left, right);
     }
 
     template<ExprConcept lhs, ExprConcept rhs>
     auto operator&(const lhs &left, const rhs &right) {
-        return MakeExprWithTwoOperands<lhs::sql + " & " + rhs::sql>(left, right);
+        return MakeExprWithTwoOperands(left.sql + " & " + right.sql, left, right);
     }
 
     template<ExprConcept lhs, ExprConcept rhs>
     auto operator|(const lhs &left, const rhs &right) {
-        return MakeExprWithTwoOperands<lhs::sql + " | " + rhs::sql>(left, right);
+        return MakeExprWithTwoOperands(left.sql + " | " + right.sql, left, right);
     }
 
     template<ExprConcept lhs, ExprConcept rhs>
     auto operator==(const lhs &left, const rhs &right) {
-        return MakeExprWithTwoOperands<lhs::sql + " = " + rhs::sql>(left, right);
+        return MakeExprWithTwoOperands(left.sql + " = " + right.sql, left, right);
     }
 
     template<ExprConcept lhs, ExprConcept rhs>
     auto operator!=(const lhs &left, const rhs &right) {
-        return MakeExprWithTwoOperands<lhs::sql + " <> " + rhs::sql>(left, right);
+        return MakeExprWithTwoOperands(left.sql + " <> " + right.sql, left, right);
     }
 
     template<ExprConcept lhs, ExprConcept rhs>
     auto operator<(const lhs &left, const rhs &right) {
-        return MakeExprWithTwoOperands<lhs::sql + " < " + rhs::sql>(left, right);
+        return MakeExprWithTwoOperands(left.sql + " < " + right.sql, left, right);
     }
 
     template<ExprConcept lhs, ExprConcept rhs>
     auto operator<=(const lhs &left, const rhs &right) {
-        return MakeExprWithTwoOperands<lhs::sql + " <= " + rhs::sql>(left, right);
+        return MakeExprWithTwoOperands(left.sql + " <= " + right.sql, left, right);
     }
 
     template<ExprConcept lhs, ExprConcept rhs>
     auto operator>(const lhs &left, const rhs &right) {
-        return MakeExprWithTwoOperands<lhs::sql + " > " + rhs::sql>(left, right);
+        return MakeExprWithTwoOperands(left.sql + " > " + right.sql, left, right);
     }
 
     template<ExprConcept lhs, ExprConcept rhs>
     auto operator>=(const lhs &left, const rhs &right) {
-        return MakeExprWithTwoOperands<lhs::sql + " >= " + rhs::sql>(left, right);
+        return MakeExprWithTwoOperands(left.sql + " >= " + right.sql, left, right);
     }
 
     template<ExprConcept lhs, ExprConcept rhs>
     auto operator<<(const lhs &left, const rhs &right) {
-        return MakeExprWithTwoOperands<lhs::sql + " << " + rhs::sql>(left, right);
+        return MakeExprWithTwoOperands(left.sql + " << " + right.sql, left, right);
     }
 
     template<ExprConcept lhs, ExprConcept rhs>
     auto operator>>(const lhs &left, const rhs &right) {
-        return MakeExprWithTwoOperands<lhs::sql + " >> " + rhs::sql>(left, right);
+        return MakeExprWithTwoOperands(left.sql + " >> " + right.sql, left, right);
     }
 
     template<ExprConcept lhs, ExprConcept rhs>
     auto Like(const lhs &left, const rhs &right) {
-        return MakeExprWithTwoOperands<lhs::sql + " LIKE " + rhs::sql>(left, right);
+        return MakeExprWithTwoOperands(left.sql + " LIKE " + right.sql, left, right);
     }
 
     template<ExprConcept lhs, ExprConcept rhs>
     auto Glob(const lhs &left, const rhs &right) {
-        return MakeExprWithTwoOperands<lhs::sql + " GLOB " + rhs::sql>(left, right);
+        return MakeExprWithTwoOperands(left.sql + " GLOB " + right.sql, left, right);
     }
 
     template<ExprConcept lhs, ExprConcept rhs>
     auto Regexp(const lhs &left, const rhs &right) {
-        return MakeExprWithTwoOperands<lhs::sql + " REGEXP " + rhs::sql>(left, right);
+        return MakeExprWithTwoOperands(left.sql + " REGEXP " + right.sql, left, right);
     }
 
     template<ExprConcept lhs, ExprConcept rhs>
     auto Match(const lhs &left, const rhs &right) {
-        return MakeExprWithTwoOperands<lhs::sql + " MATCH " + rhs::sql>(left, right);
+        return MakeExprWithTwoOperands(left.sql + " MATCH " + right.sql, left, right);
     }
 
     template<ExprConcept lhs, ExprConcept rhs>
     auto IsNull(const lhs &left, const rhs &right) {
-        return MakeExprWithTwoOperands<lhs::sql + " IS NULL " + rhs::sql>(left, right);
+        return MakeExprWithTwoOperands(left.sql + " IS NULL " + right.sql, left, right);
     }
 
     template<ExprConcept lhs, ExprConcept rhs>
     auto IsNotNull(const lhs &left, const rhs &right) {
-        return MakeExprWithTwoOperands<lhs::sql + " IS NOT NULL " + rhs::sql>(left, right);
+        return MakeExprWithTwoOperands(left.sql + " IS NOT NULL " + right.sql, left, right);
     }
 
     //TODO 確認In功能
 
-    // template<ExprConcept lhs, ExprConcept rhs>
-    // auto In(const lhs &left, const rhs &right) {
-    //     return MakeExprWithTwoOperands<lhs::sql + " IN " + rhs::sql>(left, right);
-    // }
-
-    template<ExprConcept lhs, ExprConcept rhs>
-    auto Brackets(const lhs &left, const rhs &right) {
-        return MakeExprWithTwoOperands<"(" + lhs::sql + " , " + rhs::sql + ")">(left, right);
-    }
-
     template<ExprConcept Lhs, ExprConcept Mid, ExprConcept Rhs>
     auto Between(const Lhs &left, const Mid &mid, const Rhs &right) {
-        constexpr auto newSQL = Lhs::sql + " BETWEEN " + Mid::sql + " AND " + Rhs::sql;
-        using newCols = ConcatTypeGroup<typename ConcatTypeGroup<typename Lhs::columns, typename Mid::columns>::type,
-            typename Rhs::columns>::type;
+        constexpr auto newSQL = left.sql + " BETWEEN " + mid.sql + " AND " + right.sql;
+        auto newCols = std::tuple_cat(left.cols, mid.cols, right.cols);
         auto newPara = std::tuple_cat(left.params, mid.params, right.params);
-        return std::apply([&](auto... para) {
-            return Expr<newCols, ExprResultType::NUMERIC, newSQL, std::remove_cvref_t<decltype(para)>...>(para...);
-        }, newPara);
+        return Expr<ExprResultType::NUMERIC, decltype(newCols), decltype(newPara)>{
+            .cols = newCols,
+            .sql = newSQL,
+            .params = newPara
+        };
     }
 
     template<ExprConcept expr, ExprConcept... exprs>
@@ -247,7 +263,7 @@ namespace TypeSQLite {
         if constexpr (sizeof...(rest) == 0) {
             return first.sql;
         } else {
-            return MakeExprWithTwoOperands<first.sql + ", " + MakeExprList(rest...).sql>(first, MakeExprList(rest...));
+            return MakeExprWithTwoOperands(first.sql + ", " + MakeExprList(rest...).sql, first, MakeExprList(rest...));
         }
     }
 

@@ -3,15 +3,15 @@
 #include "../src/TypeSQlite.hpp"
 
 using namespace TypeSQLite;
-using NameColumn = Column<"name", ExprResultType::TEXT>;
-using AgeColumn = Column<"age", ExprResultType::INTEGER>;
-using ScoreColumn = Column<"score", ExprResultType::REAL>;
-using DeptColumn = Column<"dept", ExprResultType::TEXT>;
-using CityColumn = Column<"city", ExprResultType::TEXT>;
-using CountryColumn = Column<"country", ExprResultType::TEXT>;
+inline Column<"name", ExprResultType::TEXT> NameColumn;
+inline Column<"age", ExprResultType::INTEGER> AgeColumn;
+inline Column<"score", ExprResultType::REAL> ScoreColumn;
+inline Column<"dept", ExprResultType::TEXT> DeptColumn;
+inline Column<"city", ExprResultType::TEXT> CityColumn;
+inline Column<"country", ExprResultType::TEXT> CountryColumn;
 
 // 定義表類型
-using UserTable = Table<"users", NameColumn, AgeColumn, ScoreColumn>;
-using DeptTable = Table<"departments", DeptColumn, NameColumn>;
-using CityTable = Table<"cities", NameColumn, CityColumn>;
-using CountryTable = Table<"countries", CityColumn, CountryColumn>;
+inline auto UserTableDefinition = MakeTableDefinition<"name">(std::make_tuple(NameColumn, AgeColumn, ScoreColumn));
+inline auto DeptTableDefinition = MakeTableDefinition<"departments">(std::make_tuple(DeptColumn, NameColumn));
+inline auto CityTableDefinition = MakeTableDefinition<"cities">(std::make_tuple(NameColumn, CityColumn));
+inline auto CountryTableDefinition = MakeTableDefinition<"countries">(std::make_tuple(CityColumn, CountryColumn));

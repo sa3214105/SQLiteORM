@@ -23,12 +23,13 @@ namespace TypeSQLite {
     }
 
     template<FixedString Name, ExprResultType Type, ColumnConstraintConcept... Constraints>
-    struct Column : Expr<TypeGroup<Column<Name, Type, Constraints...> >, Type, Name> {
+    struct Column {
         constexpr static FixedString name = Name;
-        constexpr static FixedString sql = Name;
-        constexpr static ExprResultType resultType = Type;
         constexpr static ExprResultType type = Type;
-        using columns = TypeGroup<Column>;
+        constexpr static ExprResultType resultType = Type;
+        const std::string sql = std::string(Name);
+        const std::tuple<> cols = std::make_tuple();
+        const std::tuple<> params = std::make_tuple();
         using constraints = TypeGroup<Constraints...>;
     };
 
@@ -46,7 +47,7 @@ namespace TypeSQLite {
     template<typename T, ColumnConcept U>
     struct TableColumn_Base : U {
         using TableType = T;
-        constexpr static FixedString sql = T::name + FixedString(".") + U::name;
+        const std::string sql = std::string(T::name) + "." + U::name;
     };
 
     template<typename>
@@ -76,8 +77,8 @@ namespace TypeSQLite {
 
     //TODO 暫時先放寬約束
     template<typename/*ColumnOrTableColumnConcept*/ T>
-    constexpr auto GetColumnName() {
-        return T::sql;
+    constexpr auto GetColumnName(T t) {
+        return t.sql;
         // if constexpr (TableColumnConcept<T>) {
         //     return T::TableType::name + FixedString(".") + T::name;
         // } else {
@@ -87,11 +88,11 @@ namespace TypeSQLite {
 
     //TODO 暫時先放寬約束
     template<typename/*ColumnOrTableColumnConcept*/ T, typename/*ColumnOrTableColumnConcept*/... Ts>
-    constexpr auto GetColumnNames() {
+    constexpr auto GetColumnNames(T t, Ts... ts) {
         if constexpr (sizeof...(Ts) == 0) {
-            return GetColumnName<T>();
+            return GetColumnName(t);
         } else {
-            return GetColumnName<T>() + "," + GetColumnNames<Ts...>();
+            return GetColumnName(t) + "," + GetColumnNames(ts...);
         }
     }
 
@@ -116,7 +117,7 @@ namespace TypeSQLite {
         }
     }
 
-    template<ColumnConcept Column>
+    template<typename Column>
     constexpr auto GetColumnDefinition() {
         return FixedString(" " + Column::name + " ") +
                ColumnTypeToString<Column::type>() +

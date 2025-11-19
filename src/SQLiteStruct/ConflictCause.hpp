@@ -22,4 +22,21 @@ namespace TypeSQLite {
             return FixedString(" ON CONFLICT REPLACE");
         }
     }
+
+    inline std::string ConflictCauseToString(ConflictCause Cause) {
+        switch (Cause) {
+            case ConflictCause::ROLLBACK:
+                return " ON CONFLICT ROLLBACK";
+            case ConflictCause::ABORT:
+                return " ON CONFLICT ABORT";
+            case ConflictCause::FAIL:
+                return " ON CONFLICT FAIL";
+            case ConflictCause::IGNORE:
+                return " ON CONFLICT IGNORE";
+            case ConflictCause::REPLACE:
+                return " ON CONFLICT REPLACE";
+            default:
+                throw std::invalid_argument("ConflictCause is invalid");
+        }
+    }
 }

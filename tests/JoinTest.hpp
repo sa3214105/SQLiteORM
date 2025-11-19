@@ -1,74 +1,66 @@
 #pragma once
 #include "Common.hpp"
 
+// ============ 基本 Join 測試類別 (UserTable + DeptTable) ============
+class BasicJoinTest : public ::testing::Test {
+protected:
+    Database<decltype(UserTableDefinition), decltype(DeptTableDefinition)> db =
+        Database{"test_database.db", UserTableDefinition, DeptTableDefinition};
+    Table<decltype(UserTableDefinition)> &userTable = db.GetTable<decltype(UserTableDefinition)>();
+    Table<decltype(DeptTableDefinition)> &deptTable = db.GetTable<decltype(DeptTableDefinition)>();
+
+    void SetUp() override {
+        // 每個測試前會重新建立資料庫，各測試自行插入所需資料
+    }
+
+    void TearDown() override {
+        std::remove("test_database.db");
+    }
+};
+
 // ============ Join 測試 ============
-TEST(JoinTest, InnerJoinBasic) {
-    Database<UserTable, DeptTable> db("test_database.db",true);
-    db.GetTable<UserTable>().Delete().Execute();
-    db.GetTable<DeptTable>().Delete().Execute();
+TEST_F(BasicJoinTest, InnerJoinBasic) {
     // UserTable: Alice, Bob, Charlie, David
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>,
-                                    UserTable::TableColumn<AgeColumn>>("Alice",20);
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>,
-                                    UserTable::TableColumn<AgeColumn>>("Bob",30);
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>,
-                                    UserTable::TableColumn<AgeColumn>>("Charlie",40);
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>,
-                                    UserTable::TableColumn<AgeColumn>>("David",50);
+    userTable.Insert<decltype(NameColumn), decltype(AgeColumn)>("Alice", 20);
+    userTable.Insert<decltype(NameColumn), decltype(AgeColumn)>("Bob", 30);
+    userTable.Insert<decltype(NameColumn), decltype(AgeColumn)>("Charlie", 40);
+    userTable.Insert<decltype(NameColumn), decltype(AgeColumn)>("David", 50);
+
     // DeptTable: Alice, David (只有交集部分)
-    db.GetTable<DeptTable>().Insert<DeptTable::TableColumn<DeptColumn>,
-                                    DeptTable::TableColumn<NameColumn>>("HR","Alice");
-    db.GetTable<DeptTable>().Insert<DeptTable::TableColumn<DeptColumn>,
-                                    DeptTable::TableColumn<NameColumn>>("IT","David");
+    deptTable.Insert<decltype(DeptColumn), decltype(NameColumn)>("HR", "Alice");
+    deptTable.Insert<decltype(DeptColumn), decltype(NameColumn)>("IT", "David");
 
     // InnerJoin on NameColumn - 只返回交集 (Alice, David)
-    using _NameColumn = UserTable::TableColumn<NameColumn>;
-    using _AgeColumn = UserTable::TableColumn<AgeColumn>;
-    using _DeptColumn = DeptTable::TableColumn<DeptColumn>;
-    using __NameColumn = DeptTable::TableColumn<NameColumn>;
-
-    auto results = db.GetTable<UserTable>().InnerJoin<DeptTable>(_NameColumn() == __NameColumn()).
-            Select(_NameColumn(), _AgeColumn(), _DeptColumn()).Results();
+    auto results = userTable.InnerJoin(deptTable, userTable[NameColumn] == deptTable[NameColumn])
+            .Select(userTable[NameColumn], userTable[AgeColumn], deptTable[DeptColumn])
+            .Results();
 
     // INNER JOIN 只有交集: Alice, David
     EXPECT_EQ(results.size(), 2);
     std::vector<std::string> names;
-    for (const auto &[name,age,dept]: results) {
+    for (const auto &[name, age, dept]: results) {
         names.push_back(name);
     }
     EXPECT_TRUE(std::find(names.begin(), names.end(), "Alice") != names.end());
     EXPECT_TRUE(std::find(names.begin(), names.end(), "David") != names.end());
 }
 
-TEST(JoinTest, LeftJoinBasic) {
-    Database<UserTable, DeptTable> db("test_database.db",true);
-    db.GetTable<UserTable>().Delete().Execute();
-    db.GetTable<DeptTable>().Delete().Execute();
+TEST_F(BasicJoinTest, LeftJoinBasic) {
     // UserTable: Alice, Bob, Charlie, David
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>,
-                                    UserTable::TableColumn<AgeColumn>>("Alice", 20);
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>,
-                                    UserTable::TableColumn<AgeColumn>>("Bob", 30);
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>,
-                                    UserTable::TableColumn<AgeColumn>>("Charlie", 40);
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>,
-                                    UserTable::TableColumn<AgeColumn>>("David", 50);
+    userTable.Insert<decltype(NameColumn), decltype(AgeColumn)>("Alice", 20);
+    userTable.Insert<decltype(NameColumn), decltype(AgeColumn)>("Bob", 30);
+    userTable.Insert<decltype(NameColumn), decltype(AgeColumn)>("Charlie", 40);
+    userTable.Insert<decltype(NameColumn), decltype(AgeColumn)>("David", 50);
+
     // DeptTable: Alice, David, Eve
-    db.GetTable<DeptTable>().Insert<DeptTable::TableColumn<DeptColumn>,
-                                    DeptTable::TableColumn<NameColumn>>("HR", "Alice");
-    db.GetTable<DeptTable>().Insert<DeptTable::TableColumn<DeptColumn>,
-                                    DeptTable::TableColumn<NameColumn>>("IT", "David");
-    db.GetTable<DeptTable>().Insert<DeptTable::TableColumn<DeptColumn>,
-                                    DeptTable::TableColumn<NameColumn>>("Sales", "Eve");
+    deptTable.Insert<decltype(DeptColumn), decltype(NameColumn)>("HR", "Alice");
+    deptTable.Insert<decltype(DeptColumn), decltype(NameColumn)>("IT", "David");
+    deptTable.Insert<decltype(DeptColumn), decltype(NameColumn)>("Sales", "Eve");
 
     // LeftJoin - 返回左表的所有行 (Alice, Bob, Charlie, David)
-    using _NameColumn = UserTable::TableColumn<NameColumn>;
-    using _AgeColumn = UserTable::TableColumn<AgeColumn>;
-    using _DeptColumn = DeptTable::TableColumn<DeptColumn>;
-    using __NameColumn = DeptTable::TableColumn<NameColumn>;
-
-    auto results = db.GetTable<UserTable>().LeftJoin<DeptTable>(_NameColumn() == __NameColumn()).
-            Select(_NameColumn(), _AgeColumn(), _DeptColumn()).Results();
+    auto results = userTable.LeftJoin(deptTable, userTable[NameColumn] == deptTable[NameColumn])
+            .Select(userTable[NameColumn], userTable[AgeColumn], deptTable[DeptColumn])
+            .Results();
 
     // LEFT JOIN 應返回左表的所有行
     EXPECT_EQ(results.size(), 4);
@@ -82,88 +74,59 @@ TEST(JoinTest, LeftJoinBasic) {
     EXPECT_TRUE(std::find(names.begin(), names.end(), "David") != names.end());
 }
 
-TEST(JoinTest, RightJoinBasic) {
-    Database<UserTable, DeptTable> db("test_database.db");
-    db.GetTable<UserTable>().Delete().Execute();
-    db.GetTable<DeptTable>().Delete().Execute();
+TEST_F(BasicJoinTest, RightJoinBasic) {
     // UserTable: Alice, Bob
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>,
-                                    UserTable::TableColumn<AgeColumn>>("Alice", 20);
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>,
-                                    UserTable::TableColumn<AgeColumn>>("Bob", 30);
+    userTable.Insert<decltype(NameColumn), decltype(AgeColumn)>("Alice", 20);
+    userTable.Insert<decltype(NameColumn), decltype(AgeColumn)>("Bob", 30);
+
     // DeptTable: Alice, David, Eve (比左表多)
-    db.GetTable<DeptTable>().Insert<DeptTable::TableColumn<DeptColumn>,
-                                    DeptTable::TableColumn<NameColumn>>("HR", "Alice");
-    db.GetTable<DeptTable>().Insert<DeptTable::TableColumn<DeptColumn>,
-                                    DeptTable::TableColumn<NameColumn>>("IT", "David");
-    db.GetTable<DeptTable>().Insert<DeptTable::TableColumn<DeptColumn>,
-                                    DeptTable::TableColumn<NameColumn>>("Sales", "Eve");
+    deptTable.Insert<decltype(DeptColumn), decltype(NameColumn)>("HR", "Alice");
+    deptTable.Insert<decltype(DeptColumn), decltype(NameColumn)>("IT", "David");
+    deptTable.Insert<decltype(DeptColumn), decltype(NameColumn)>("Sales", "Eve");
 
     // RightJoin - 返回右表的所有行 (Alice, David, Eve)
-    using _NameColumn = UserTable::TableColumn<NameColumn>;
-    using _AgeColumn = UserTable::TableColumn<AgeColumn>;
-    using _DeptColumn = DeptTable::TableColumn<DeptColumn>;
-    using __NameColumn = DeptTable::TableColumn<NameColumn>;
-
-    auto results = db.GetTable<UserTable>().RightJoin<DeptTable>(_NameColumn() == __NameColumn()).
-            Select(_NameColumn(), _AgeColumn(), _DeptColumn()).Results();
+    auto results = userTable.RightJoin(deptTable, userTable[NameColumn] == deptTable[NameColumn])
+            .Select(userTable[NameColumn], userTable[AgeColumn], deptTable[DeptColumn])
+            .Results();
 
     // RIGHT JOIN 應返回右表的所有行 - 至少應該包含右表中的所有行
     EXPECT_GE(results.size(), 3);
 }
 
-TEST(JoinTest, CrossJoinBasic) {
-    Database<UserTable, DeptTable> db("test_database.db");
-    db.GetTable<UserTable>().Delete().Execute();
-    db.GetTable<DeptTable>().Delete().Execute();
+TEST_F(BasicJoinTest, CrossJoinBasic) {
     // UserTable: Alice, Bob
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>,
-                                    UserTable::TableColumn<AgeColumn>>("Alice", 20);
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>,
-                                    UserTable::TableColumn<AgeColumn>>("Bob", 30);
+    userTable.Insert<decltype(NameColumn), decltype(AgeColumn)>("Alice", 20);
+    userTable.Insert<decltype(NameColumn), decltype(AgeColumn)>("Bob", 30);
+
     // DeptTable: HR, IT
-    db.GetTable<DeptTable>().Insert<DeptTable::TableColumn<DeptColumn>,
-                                    DeptTable::TableColumn<NameColumn>>("HR", "X");
-    db.GetTable<DeptTable>().Insert<DeptTable::TableColumn<DeptColumn>,
-                                    DeptTable::TableColumn<NameColumn>>("IT", "Y");
+    deptTable.Insert<decltype(DeptColumn), decltype(NameColumn)>("HR", "X");
+    deptTable.Insert<decltype(DeptColumn), decltype(NameColumn)>("IT", "Y");
 
     // CrossJoin - 笛卡爾乘積 (2 x 2 = 4)
-    using _NameColumn = UserTable::TableColumn<NameColumn>;
-    using _AgeColumn = UserTable::TableColumn<AgeColumn>;
-    using _DeptColumn = DeptTable::TableColumn<DeptColumn>;
-
-    auto results = db.GetTable<UserTable>().CrossJoin<DeptTable>(1_expr == 1_expr).
-            Select(_NameColumn(), _AgeColumn(), _DeptColumn()).Results();
+    auto results = userTable.CrossJoin(deptTable, 1_expr == 1_expr)
+            .Select(userTable[NameColumn], userTable[AgeColumn], deptTable[DeptColumn])
+            .Results();
 
     // CROSS JOIN 應返回笛卡爾乘積的結果 (2 x 2 = 4)
     EXPECT_EQ(results.size(), 4);
 }
 
-TEST(JoinTest, FullJoinBasic) {
-    Database<UserTable, DeptTable> db("test_database.db",true);
-    db.GetTable<UserTable>().Delete().Execute();
-    db.GetTable<DeptTable>().Delete().Execute();
+TEST_F(BasicJoinTest, FullJoinBasic) {
     // UserTable: Alice, Bob, Charlie, David
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>,
-                                    UserTable::TableColumn<AgeColumn>>("Alice", 20);
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>,
-                                    UserTable::TableColumn<AgeColumn>>("Bob", 30);
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>,
-                                    UserTable::TableColumn<AgeColumn>>("Charlie", 40);
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>,
-                                    UserTable::TableColumn<AgeColumn>>("David", 50);
+    userTable.Insert<decltype(NameColumn), decltype(AgeColumn)>("Alice", 20);
+    userTable.Insert<decltype(NameColumn), decltype(AgeColumn)>("Bob", 30);
+    userTable.Insert<decltype(NameColumn), decltype(AgeColumn)>("Charlie", 40);
+    userTable.Insert<decltype(NameColumn), decltype(AgeColumn)>("David", 50);
+
     // DeptTable: Alice, David
-    db.GetTable<DeptTable>().Insert<DeptTable::TableColumn<DeptColumn>,
-                                    DeptTable::TableColumn<NameColumn>>("HR", "Alice");
-    db.GetTable<DeptTable>().Insert<DeptTable::TableColumn<DeptColumn>,
-                                    DeptTable::TableColumn<NameColumn>>("IT", "David");
+    deptTable.Insert<decltype(DeptColumn), decltype(NameColumn)>("HR", "Alice");
+    deptTable.Insert<decltype(DeptColumn), decltype(NameColumn)>("IT", "David");
+
     // FullJoin on NameColumn
-    using _NameColumn = UserTable::TableColumn<NameColumn>;
-    using _AgeColumn = UserTable::TableColumn<AgeColumn>;
-    using _DeptColumn = DeptTable::TableColumn<DeptColumn>;
-    using __NameColumn = DeptTable::TableColumn<NameColumn>;
-    auto results = db.GetTable<UserTable>().FullJoin<DeptTable>(_NameColumn() == __NameColumn()).
-            Select(_NameColumn(), _AgeColumn(), _DeptColumn()).Results();
+    auto results = userTable.FullJoin(deptTable, userTable[NameColumn] == deptTable[NameColumn])
+            .Select(userTable[NameColumn], userTable[AgeColumn], deptTable[DeptColumn])
+            .Results();
+
     // 應該有 4 筆: Alice(交集), Bob(左), Charlie(左), David(交集)
     std::vector<std::string> names;
     std::vector<std::string> depts;
@@ -180,44 +143,45 @@ TEST(JoinTest, FullJoinBasic) {
     EXPECT_EQ(results.size(), 4);
 }
 
-// ============ 多重 Join 測試 ============
-TEST(JoinTest, MultiJoin_Inner_Inner_ThreeTables) {
-    Database<UserTable, CityTable, CountryTable> db("test_database.db",true);
-    db.GetTable<UserTable>().Delete().Execute();
-    db.GetTable<CityTable>().Delete().Execute();
-    db.GetTable<CountryTable>().Delete().Execute();
+// ============ 多重 Join 測試類別 (UserTable + CityTable + CountryTable) ============
+class MultiJoinTest : public ::testing::Test {
+protected:
+    Database<decltype(UserTableDefinition), decltype(CityTableDefinition), decltype(CountryTableDefinition)> db =
+        Database{"test_database.db", UserTableDefinition, CityTableDefinition, CountryTableDefinition};
+    Table<decltype(UserTableDefinition)> &userTable = db.GetTable<decltype(UserTableDefinition)>();
+    Table<decltype(CityTableDefinition)> &cityTable = db.GetTable<decltype(CityTableDefinition)>();
+    Table<decltype(CountryTableDefinition)> &countryTable = db.GetTable<decltype(CountryTableDefinition)>();
 
+    void SetUp() override {
+        // 每個測試前會重新建立資料庫
+    }
+
+    void TearDown() override {
+        std::remove("test_database.db");
+    }
+};
+
+// ============ 多重 Join 測試 ============
+TEST_F(MultiJoinTest, MultiJoin_Inner_Inner_ThreeTables) {
     // users
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>>("Alice");
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>>("Bob");
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>>("Eve");
+    userTable.Insert<decltype(NameColumn)>("Alice");
+    userTable.Insert<decltype(NameColumn)>("Bob");
+    userTable.Insert<decltype(NameColumn)>("Eve");
 
     // cities
-    db.GetTable<CityTable>().Insert<CityTable::TableColumn<NameColumn>,
-                                    CityTable::TableColumn<CityColumn>>("Alice", "Paris");
-    db.GetTable<CityTable>().Insert<CityTable::TableColumn<NameColumn>,
-                                    CityTable::TableColumn<CityColumn>>("Bob", "Tokyo");
-    db.GetTable<CityTable>().Insert<CityTable::TableColumn<NameColumn>,
-                                    CityTable::TableColumn<CityColumn>>("Mallory", "Berlin");
+    cityTable.Insert<decltype(NameColumn), decltype(CityColumn)>("Alice", "Paris");
+    cityTable.Insert<decltype(NameColumn), decltype(CityColumn)>("Bob", "Tokyo");
+    cityTable.Insert<decltype(NameColumn), decltype(CityColumn)>("Mallory", "Berlin");
 
     // countries
-    db.GetTable<CountryTable>().Insert<CountryTable::TableColumn<CityColumn>,
-                                       CountryTable::TableColumn<CountryColumn>>("Paris", "France");
-    db.GetTable<CountryTable>().Insert<CountryTable::TableColumn<CityColumn>,
-                                       CountryTable::TableColumn<CountryColumn>>("Tokyo", "Japan");
-    db.GetTable<CountryTable>().Insert<CountryTable::TableColumn<CityColumn>,
-                                       CountryTable::TableColumn<CountryColumn>>("Berlin", "Germany");
+    countryTable.Insert<decltype(CityColumn), decltype(CountryColumn)>("Paris", "France");
+    countryTable.Insert<decltype(CityColumn), decltype(CountryColumn)>("Tokyo", "Japan");
+    countryTable.Insert<decltype(CityColumn), decltype(CountryColumn)>("Berlin", "Germany");
 
-    using UName = UserTable::TableColumn<NameColumn>;
-    using CName = CityTable::TableColumn<NameColumn>;
-    using UCity = CityTable::TableColumn<CityColumn>;
-    using CCty = CountryTable::TableColumn<CityColumn>;
-    using UCountry = CountryTable::TableColumn<CountryColumn>;
-
-    auto results = db.GetTable<UserTable>()
-            .InnerJoin<CityTable>(UName() == CName())
-            .InnerJoin<CountryTable>(UCity() == CCty())
-            .Select(UName(), UCity(), UCountry())
+    auto results = userTable
+            .InnerJoin(cityTable, userTable[NameColumn] == cityTable[NameColumn])
+            .InnerJoin(countryTable, cityTable[CityColumn] == countryTable[CityColumn])
+            .Select(userTable[NameColumn], cityTable[CityColumn], countryTable[CountryColumn])
             .Results();
 
     ASSERT_EQ(results.size(), 2);
@@ -229,37 +193,23 @@ TEST(JoinTest, MultiJoin_Inner_Inner_ThreeTables) {
     EXPECT_NE(std::find(countries.begin(), countries.end(), "Japan"), countries.end());
 }
 
-TEST(JoinTest, MultiJoin_Left_Left_ThreeTables) {
-    Database<UserTable, CityTable, CountryTable> db("test_database.db",true);
-    db.GetTable<UserTable>().Delete().Execute();
-    db.GetTable<CityTable>().Delete().Execute();
-    db.GetTable<CountryTable>().Delete().Execute();
-
+TEST_F(MultiJoinTest, MultiJoin_Left_Left_ThreeTables) {
     // users
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>>("Alice");
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>>("Bob");
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>>("Charlie");
+    userTable.Insert<decltype(NameColumn)>("Alice");
+    userTable.Insert<decltype(NameColumn)>("Bob");
+    userTable.Insert<decltype(NameColumn)>("Charlie");
 
     // cities (Charlie has no city)
-    db.GetTable<CityTable>().Insert<CityTable::TableColumn<NameColumn>,
-                                    CityTable::TableColumn<CityColumn>>("Alice", "Paris");
-    db.GetTable<CityTable>().Insert<CityTable::TableColumn<NameColumn>,
-                                    CityTable::TableColumn<CityColumn>>("Bob", "Tokyo");
+    cityTable.Insert<decltype(NameColumn), decltype(CityColumn)>("Alice", "Paris");
+    cityTable.Insert<decltype(NameColumn), decltype(CityColumn)>("Bob", "Tokyo");
 
     // countries (Tokyo has no country)
-    db.GetTable<CountryTable>().Insert<CountryTable::TableColumn<CityColumn>,
-                                       CountryTable::TableColumn<CountryColumn>>("Paris", "France");
+    countryTable.Insert<decltype(CityColumn), decltype(CountryColumn)>("Paris", "France");
 
-    using UName = UserTable::TableColumn<NameColumn>;
-    using CName = CityTable::TableColumn<NameColumn>;
-    using UCity = CityTable::TableColumn<CityColumn>;
-    using CCty = CountryTable::TableColumn<CityColumn>;
-    using UCountry = CountryTable::TableColumn<CountryColumn>;
-
-    auto results = db.GetTable<UserTable>()
-            .LeftJoin<CityTable>(UName() == CName())
-            .LeftJoin<CountryTable>(UCity() == CCty())
-            .Select(UName(), UCity(), UCountry())
+    auto results = userTable
+            .LeftJoin(cityTable, userTable[NameColumn] == cityTable[NameColumn])
+            .LeftJoin(countryTable, cityTable[CityColumn] == countryTable[CityColumn])
+            .Select(userTable[NameColumn], cityTable[CityColumn], countryTable[CountryColumn])
             .Results();
 
     ASSERT_EQ(results.size(), 3);
@@ -276,37 +226,41 @@ TEST(JoinTest, MultiJoin_Left_Left_ThreeTables) {
     EXPECT_TRUE(hasEmptyForCharlie);
 }
 
-TEST(JoinTest, MultiJoin_Inner_Then_Left) {
-    Database<UserTable, DeptTable, CityTable> db("test_database.db",true);
-    db.GetTable<UserTable>().Delete().Execute();
-    db.GetTable<DeptTable>().Delete().Execute();
-    db.GetTable<CityTable>().Delete().Execute();
+// ============ 混合 Join 測試類別 (UserTable + DeptTable + CityTable) ============
+class MixedJoinTest : public ::testing::Test {
+protected:
+    Database<decltype(UserTableDefinition), decltype(DeptTableDefinition), decltype(CityTableDefinition)> db =
+        Database{"test_database.db", UserTableDefinition, DeptTableDefinition, CityTableDefinition};
+    Table<decltype(UserTableDefinition)> &userTable = db.GetTable<decltype(UserTableDefinition)>();
+    Table<decltype(DeptTableDefinition)> &deptTable = db.GetTable<decltype(DeptTableDefinition)>();
+    Table<decltype(CityTableDefinition)> &cityTable = db.GetTable<decltype(CityTableDefinition)>();
 
+    void SetUp() override {
+        // 每個測試前會重新建立資料庫
+    }
+
+    void TearDown() override {
+        std::remove("test_database.db");
+    }
+};
+
+TEST_F(MixedJoinTest, MultiJoin_Inner_Then_Left) {
     // users
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>>("Alice");
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>>("Bob");
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>>("Eve");
+    userTable.Insert<decltype(NameColumn)>("Alice");
+    userTable.Insert<decltype(NameColumn)>("Bob");
+    userTable.Insert<decltype(NameColumn)>("Eve");
 
     // departments (only Alice and Bob)
-    db.GetTable<DeptTable>().Insert<DeptTable::TableColumn<DeptColumn>,
-                                    DeptTable::TableColumn<NameColumn>>("HR", "Alice");
-    db.GetTable<DeptTable>().Insert<DeptTable::TableColumn<DeptColumn>,
-                                    DeptTable::TableColumn<NameColumn>>("IT", "Bob");
+    deptTable.Insert<decltype(DeptColumn), decltype(NameColumn)>("HR", "Alice");
+    deptTable.Insert<decltype(DeptColumn), decltype(NameColumn)>("IT", "Bob");
 
     // cities (only Alice)
-    db.GetTable<CityTable>().Insert<CityTable::TableColumn<NameColumn>,
-                                    CityTable::TableColumn<CityColumn>>("Alice", "Paris");
+    cityTable.Insert<decltype(NameColumn), decltype(CityColumn)>("Alice", "Paris");
 
-    using UName = UserTable::TableColumn<NameColumn>;
-    using DName = DeptTable::TableColumn<NameColumn>;
-    using Dept = DeptTable::TableColumn<DeptColumn>;
-    using CName = CityTable::TableColumn<NameColumn>;
-    using City = CityTable::TableColumn<CityColumn>;
-
-    auto results = db.GetTable<UserTable>()
-            .InnerJoin<DeptTable>(UName() == DName())
-            .LeftJoin<CityTable>(UName() == CName())
-            .Select(UName(), Dept(), City())
+    auto results = userTable
+            .InnerJoin(deptTable, userTable[NameColumn] == deptTable[NameColumn])
+            .LeftJoin(cityTable, userTable[NameColumn] == cityTable[NameColumn])
+            .Select(userTable[NameColumn], deptTable[DeptColumn], cityTable[CityColumn])
             .Results();
 
     // Only Alice and Bob (inner with Dept), with city only for Alice

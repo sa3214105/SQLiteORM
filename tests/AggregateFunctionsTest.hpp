@@ -1,44 +1,30 @@
 #pragma once
-#include <gtest/gtest.h>
 #include "Common.hpp"
+
+// ============ 聚合函數測試 ============
 
 class AggregateFunctionTest : public ::testing::Test {
 protected:
+    Database<decltype(UserTableDefinition)> db = Database{"test_aggregate.db", UserTableDefinition};
+    Table<decltype(UserTableDefinition)> &userTable = db.GetTable<decltype(UserTableDefinition)>();
+
     void SetUp() override {
         // 插入測試數據
-        db.GetTable<UserTable>().Insert<
-            UserTable::TableColumn<NameColumn>,
-            UserTable::TableColumn<AgeColumn>,
-            UserTable::TableColumn<ScoreColumn>
-        >("Alice", 25, 85.5);
-        db.GetTable<UserTable>().Insert<
-            UserTable::TableColumn<NameColumn>,
-            UserTable::TableColumn<AgeColumn>,
-            UserTable::TableColumn<ScoreColumn>
-        >("Bob", 30, 92.0);
-        db.GetTable<UserTable>().Insert<
-            UserTable::TableColumn<NameColumn>,
-            UserTable::TableColumn<AgeColumn>,
-            UserTable::TableColumn<ScoreColumn>
-        >("Charlie", 25, 78.5);
-        db.GetTable<UserTable>().Insert<
-            UserTable::TableColumn<NameColumn>,
-            UserTable::TableColumn<AgeColumn>,
-            UserTable::TableColumn<ScoreColumn>
-        >("David", 35, 88.0);
+        userTable.Insert<decltype(NameColumn), decltype(AgeColumn), decltype(ScoreColumn)>("Alice", 25, 85.5);
+        userTable.Insert<decltype(NameColumn), decltype(AgeColumn), decltype(ScoreColumn)>("Bob", 30, 92.0);
+        userTable.Insert<decltype(NameColumn), decltype(AgeColumn), decltype(ScoreColumn)>("Charlie", 25, 78.5);
+        userTable.Insert<decltype(NameColumn), decltype(AgeColumn), decltype(ScoreColumn)>("David", 35, 88.0);
     }
 
     void TearDown() override {
         std::remove("test_aggregate.db");
     }
-
-    Database<UserTable> db{"test_aggregate.db"};
 };
 
 // 測試 COUNT 函數
 TEST_F(AggregateFunctionTest, CountFunction) {
-    auto results = db.GetTable<UserTable>().Select(
-        Count(UserTable::TableColumn<NameColumn>())
+    auto results = userTable.Select(
+        Count(userTable[NameColumn])
     ).Results();
 
     ASSERT_EQ(results.size(), 1);
@@ -48,8 +34,8 @@ TEST_F(AggregateFunctionTest, CountFunction) {
 
 // 測試 AVG 函數
 TEST_F(AggregateFunctionTest, AvgFunction) {
-    auto results = db.GetTable<UserTable>().Select(
-        Avg(UserTable::TableColumn<ScoreColumn>())
+    auto results = userTable.Select(
+        Avg(userTable[ScoreColumn])
     ).Results();
 
     ASSERT_EQ(results.size(), 1);
@@ -59,8 +45,8 @@ TEST_F(AggregateFunctionTest, AvgFunction) {
 
 // 測試 MAX 函數
 TEST_F(AggregateFunctionTest, MaxFunction) {
-    auto results = db.GetTable<UserTable>().Select(
-        Max(UserTable::TableColumn<AgeColumn>())
+    auto results = userTable.Select(
+        Max(userTable[AgeColumn])
     ).Results();
 
     ASSERT_EQ(results.size(), 1);
@@ -70,8 +56,8 @@ TEST_F(AggregateFunctionTest, MaxFunction) {
 
 // 測試 MIN 函數
 TEST_F(AggregateFunctionTest, MinFunction) {
-    auto results = db.GetTable<UserTable>().Select(
-        Min(UserTable::TableColumn<ScoreColumn>())
+    auto results = userTable.Select(
+        Min(userTable[ScoreColumn])
     ).Results();
 
     ASSERT_EQ(results.size(), 1);
@@ -81,8 +67,8 @@ TEST_F(AggregateFunctionTest, MinFunction) {
 
 // 測試 SUM 函數
 TEST_F(AggregateFunctionTest, SumFunction) {
-    auto results = db.GetTable<UserTable>().Select(
-        Sum(UserTable::TableColumn<AgeColumn>())
+    auto results = userTable.Select(
+        Sum(userTable[AgeColumn])
     ).Results();
 
     ASSERT_EQ(results.size(), 1);
@@ -92,8 +78,8 @@ TEST_F(AggregateFunctionTest, SumFunction) {
 
 // 測試 TOTAL 函數
 TEST_F(AggregateFunctionTest, TotalFunction) {
-    auto results = db.GetTable<UserTable>().Select(
-        Total(UserTable::TableColumn<ScoreColumn>())
+    auto results = userTable.Select(
+        Total(userTable[ScoreColumn])
     ).Results();
 
     ASSERT_EQ(results.size(), 1);
@@ -103,10 +89,10 @@ TEST_F(AggregateFunctionTest, TotalFunction) {
 
 // 測試多個聚合函數組合
 TEST_F(AggregateFunctionTest, MultipleAggregateFunctions) {
-    auto results = db.GetTable<UserTable>().Select(
-        Count(UserTable::TableColumn<NameColumn>()),
-        Avg(UserTable::TableColumn<AgeColumn>()),
-        Max(UserTable::TableColumn<ScoreColumn>())
+    auto results = userTable.Select(
+        Count(userTable[NameColumn]),
+        Avg(userTable[AgeColumn]),
+        Max(userTable[ScoreColumn])
     ).Results();
 
     ASSERT_EQ(results.size(), 1);
@@ -118,9 +104,9 @@ TEST_F(AggregateFunctionTest, MultipleAggregateFunctions) {
 
 // 測試聚合函數與 WHERE 條件組合
 TEST_F(AggregateFunctionTest, AggregateFunctionWithWhere) {
-    auto results = db.GetTable<UserTable>().Select(
-        Avg(UserTable::TableColumn<ScoreColumn>())
-    ).Where(UserTable::TableColumn<AgeColumn>() > 25_expr).Results();
+    auto results = userTable.Select(
+        Avg(userTable[ScoreColumn])
+    ).Where(userTable[AgeColumn] > 25_expr).Results();
 
     ASSERT_EQ(results.size(), 1);
     auto avg_score = std::get<0>(results[0]);
@@ -129,10 +115,10 @@ TEST_F(AggregateFunctionTest, AggregateFunctionWithWhere) {
 
 // 測試 GROUP BY 單列
 TEST_F(AggregateFunctionTest, GroupBySingleColumn) {
-    auto results = db.GetTable<UserTable>().Select(
-        UserTable::TableColumn<AgeColumn>(),
-        Count(UserTable::TableColumn<NameColumn>())
-    ).GroupBy(UserTable::TableColumn<AgeColumn>()).Results();
+    auto results = userTable.Select(
+        userTable[AgeColumn],
+        Count(userTable[NameColumn])
+    ).GroupBy(userTable[AgeColumn]).Results();
 
     ASSERT_EQ(results.size(), 3); // 3 個不同的年齡組
 
@@ -149,13 +135,13 @@ TEST_F(AggregateFunctionTest, GroupBySingleColumn) {
 
 // 測試 GROUP BY 與多個聚合函數
 TEST_F(AggregateFunctionTest, GroupByWithMultipleAggregates) {
-    auto results = db.GetTable<UserTable>().Select(
-        UserTable::TableColumn<AgeColumn>(),
-        Count(UserTable::TableColumn<NameColumn>()),
-        Avg(UserTable::TableColumn<ScoreColumn>()),
-        Min(UserTable::TableColumn<ScoreColumn>()),
-        Max(UserTable::TableColumn<ScoreColumn>())
-    ).GroupBy(UserTable::TableColumn<AgeColumn>()).Results();
+    auto results = userTable.Select(
+        userTable[AgeColumn],
+        Count(userTable[NameColumn]),
+        Avg(userTable[ScoreColumn]),
+        Min(userTable[ScoreColumn]),
+        Max(userTable[ScoreColumn])
+    ).GroupBy(userTable[AgeColumn]).Results();
 
     ASSERT_EQ(results.size(), 3);
 
@@ -181,12 +167,12 @@ TEST_F(AggregateFunctionTest, GroupByWithMultipleAggregates) {
 
 // 測試 GROUP BY 與 WHERE 組合
 TEST_F(AggregateFunctionTest, GroupByWithWhere) {
-    auto results = db.GetTable<UserTable>().Select(
-        UserTable::TableColumn<AgeColumn>(),
-        Count(UserTable::TableColumn<NameColumn>()),
-        Avg(UserTable::TableColumn<ScoreColumn>())
-    ).Where(UserTable::TableColumn<ScoreColumn>() > 80.0_expr)
-     .GroupBy(UserTable::TableColumn<AgeColumn>())
+    auto results = userTable.Select(
+        userTable[AgeColumn],
+        Count(userTable[NameColumn]),
+        Avg(userTable[ScoreColumn])
+    ).Where(userTable[ScoreColumn] > 80.0_expr)
+     .GroupBy(userTable[AgeColumn])
      .Results();
 
     // 只有 score > 80 的記錄: Alice(25, 85.5), Bob(30, 92.0), David(35, 88.0)
@@ -208,10 +194,10 @@ TEST_F(AggregateFunctionTest, GroupByWithWhere) {
 
 // 測試 SUM 與 GROUP BY
 TEST_F(AggregateFunctionTest, SumWithGroupBy) {
-    auto results = db.GetTable<UserTable>().Select(
-        UserTable::TableColumn<AgeColumn>(),
-        Sum(UserTable::TableColumn<ScoreColumn>())
-    ).GroupBy(UserTable::TableColumn<AgeColumn>()).Results();
+    auto results = userTable.Select(
+        userTable[AgeColumn],
+        Sum(userTable[ScoreColumn])
+    ).GroupBy(userTable[AgeColumn]).Results();
 
     ASSERT_EQ(results.size(), 3);
 
@@ -228,9 +214,9 @@ TEST_F(AggregateFunctionTest, SumWithGroupBy) {
 
 // 測試 MIN 和 MAX 組合
 TEST_F(AggregateFunctionTest, MinMaxCombination) {
-    auto results = db.GetTable<UserTable>().Select(
-        Min(UserTable::TableColumn<ScoreColumn>()),
-        Max(UserTable::TableColumn<ScoreColumn>())
+    auto results = userTable.Select(
+        Min(userTable[ScoreColumn]),
+        Max(userTable[ScoreColumn])
     ).Results();
 
     ASSERT_EQ(results.size(), 1);
@@ -241,10 +227,10 @@ TEST_F(AggregateFunctionTest, MinMaxCombination) {
 
 // 測試空表的聚合函數
 TEST_F(AggregateFunctionTest, AggregateFunctionOnEmptyTable) {
-    db.GetTable<UserTable>().Delete().Execute();
+    userTable.Delete().Execute();
 
-    auto results = db.GetTable<UserTable>().Select(
-        Count(UserTable::TableColumn<NameColumn>())
+    auto results = userTable.Select(
+        Count(userTable[NameColumn])
     ).Results();
 
     ASSERT_EQ(results.size(), 1);
@@ -254,9 +240,9 @@ TEST_F(AggregateFunctionTest, AggregateFunctionOnEmptyTable) {
 
 // 測試 COUNT 與 WHERE 條件
 TEST_F(AggregateFunctionTest, CountWithWhere) {
-    auto results = db.GetTable<UserTable>().Select(
-        Count(UserTable::TableColumn<NameColumn>())
-    ).Where(UserTable::TableColumn<AgeColumn>() == 25_expr).Results();
+    auto results = userTable.Select(
+        Count(userTable[NameColumn])
+    ).Where(userTable[AgeColumn] == 25_expr).Results();
 
     ASSERT_EQ(results.size(), 1);
     auto count = std::get<0>(results[0]);
@@ -265,9 +251,9 @@ TEST_F(AggregateFunctionTest, CountWithWhere) {
 
 // 測試 TOTAL 與 SUM 的差異
 TEST_F(AggregateFunctionTest, TotalVsSum) {
-    auto results = db.GetTable<UserTable>().Select(
-        Sum(UserTable::TableColumn<ScoreColumn>()),
-        Total(UserTable::TableColumn<ScoreColumn>())
+    auto results = userTable.Select(
+        Sum(userTable[ScoreColumn]),
+        Total(userTable[ScoreColumn])
     ).Results();
 
     ASSERT_EQ(results.size(), 1);
@@ -278,13 +264,13 @@ TEST_F(AggregateFunctionTest, TotalVsSum) {
 
 // 測試所有基本聚合函數組合
 TEST_F(AggregateFunctionTest, AllBasicAggregateFunctions) {
-    auto results = db.GetTable<UserTable>().Select(
-        Count(UserTable::TableColumn<NameColumn>()),
-        Sum(UserTable::TableColumn<AgeColumn>()),
-        Avg(UserTable::TableColumn<ScoreColumn>()),
-        Min(UserTable::TableColumn<ScoreColumn>()),
-        Max(UserTable::TableColumn<ScoreColumn>()),
-        Total(UserTable::TableColumn<AgeColumn>())
+    auto results = userTable.Select(
+        Count(userTable[NameColumn]),
+        Sum(userTable[AgeColumn]),
+        Avg(userTable[ScoreColumn]),
+        Min(userTable[ScoreColumn]),
+        Max(userTable[ScoreColumn]),
+        Total(userTable[AgeColumn])
     ).Results();
 
     ASSERT_EQ(results.size(), 1);
@@ -300,11 +286,11 @@ TEST_F(AggregateFunctionTest, AllBasicAggregateFunctions) {
 
 // 測試 AVG 與 WHERE 條件的精確計算
 TEST_F(AggregateFunctionTest, AvgWithWhereExactCalculation) {
-    auto results = db.GetTable<UserTable>().Select(
-        Count(UserTable::TableColumn<NameColumn>()),
-        Avg(UserTable::TableColumn<ScoreColumn>()),
-        Sum(UserTable::TableColumn<ScoreColumn>())
-    ).Where(UserTable::TableColumn<AgeColumn>() == 25_expr).Results();
+    auto results = userTable.Select(
+        Count(userTable[NameColumn]),
+        Avg(userTable[ScoreColumn]),
+        Sum(userTable[ScoreColumn])
+    ).Where(userTable[AgeColumn] == 25_expr).Results();
 
     ASSERT_EQ(results.size(), 1);
     auto [count, avg_score, sum_score] = results[0];
@@ -316,10 +302,10 @@ TEST_F(AggregateFunctionTest, AvgWithWhereExactCalculation) {
 
 // 測試 MIN/MAX 與條件組合
 TEST_F(AggregateFunctionTest, MinMaxWithCondition) {
-    auto results = db.GetTable<UserTable>().Select(
-        Min(UserTable::TableColumn<AgeColumn>()),
-        Max(UserTable::TableColumn<AgeColumn>())
-    ).Where(UserTable::TableColumn<ScoreColumn>() > 80.0_expr).Results();
+    auto results = userTable.Select(
+        Min(userTable[AgeColumn]),
+        Max(userTable[AgeColumn])
+    ).Where(userTable[ScoreColumn] > 80.0_expr).Results();
 
     ASSERT_EQ(results.size(), 1);
     auto [min_age, max_age] = results[0];
@@ -331,35 +317,35 @@ TEST_F(AggregateFunctionTest, MinMaxWithCondition) {
 // 測試 COUNT 在不同條件下的結果
 TEST_F(AggregateFunctionTest, CountWithDifferentConditions) {
     // 測試大於條件
-    auto results1 = db.GetTable<UserTable>().Select(
-        Count(UserTable::TableColumn<NameColumn>())
-    ).Where(UserTable::TableColumn<AgeColumn>() > 25_expr).Results();
+    auto results1 = userTable.Select(
+        Count(userTable[NameColumn])
+    ).Where(userTable[AgeColumn] > 25_expr).Results();
     EXPECT_EQ(std::get<0>(results1[0]), 2); // Bob, David
 
     // 測試大於等於條件
-    auto results2 = db.GetTable<UserTable>().Select(
-        Count(UserTable::TableColumn<NameColumn>())
-    ).Where(UserTable::TableColumn<AgeColumn>() >= 25_expr).Results();
+    auto results2 = userTable.Select(
+        Count(userTable[NameColumn])
+    ).Where(userTable[AgeColumn] >= 25_expr).Results();
     EXPECT_EQ(std::get<0>(results2[0]), 4); // All
 
     // 測試小於條件
-    auto results3 = db.GetTable<UserTable>().Select(
-        Count(UserTable::TableColumn<NameColumn>())
-    ).Where(UserTable::TableColumn<AgeColumn>() < 30_expr).Results();
+    auto results3 = userTable.Select(
+        Count(userTable[NameColumn])
+    ).Where(userTable[AgeColumn] < 30_expr).Results();
     EXPECT_EQ(std::get<0>(results3[0]), 2); // Alice, Charlie
 }
 
 // 測試 SUM 在不同數據類型上的使用
 TEST_F(AggregateFunctionTest, SumOnDifferentTypes) {
     // Integer 類型
-    auto results_int = db.GetTable<UserTable>().Select(
-        Sum(UserTable::TableColumn<AgeColumn>())
+    auto results_int = userTable.Select(
+        Sum(userTable[AgeColumn])
     ).Results();
     EXPECT_EQ(std::get<0>(results_int[0]), 115);
 
     // Real 類型
-    auto results_real = db.GetTable<UserTable>().Select(
-        Sum(UserTable::TableColumn<ScoreColumn>())
+    auto results_real = userTable.Select(
+        Sum(userTable[ScoreColumn])
     ).Results();
     EXPECT_NEAR(std::get<0>(results_real[0]), 344.0, 0.1);
 }
@@ -367,9 +353,9 @@ TEST_F(AggregateFunctionTest, SumOnDifferentTypes) {
 // 測試聚合函數與 LIMIT 組合
 TEST_F(AggregateFunctionTest, AggregateFunctionWithLimit) {
     // 對聚合函數使用 LIMIT 應該能正常工作
-    auto results = db.GetTable<UserTable>().Select(
-        Count(UserTable::TableColumn<NameColumn>()),
-        Avg(UserTable::TableColumn<ScoreColumn>())
+    auto results = userTable.Select(
+        Count(userTable[NameColumn]),
+        Avg(userTable[ScoreColumn])
     ).LimitOffset(1).Results();
 
     ASSERT_EQ(results.size(), 1);
@@ -380,35 +366,35 @@ TEST_F(AggregateFunctionTest, AggregateFunctionWithLimit) {
 
 // 測試 GROUP BY 與 LIMIT 組合
 TEST_F(AggregateFunctionTest, GroupByWithLimit) {
-    auto results = db.GetTable<UserTable>().Select(
-        UserTable::TableColumn<AgeColumn>(),
-        Count(UserTable::TableColumn<NameColumn>())
-    ).GroupBy(UserTable::TableColumn<AgeColumn>()).LimitOffset(2).Results();
+    auto results = userTable.Select(
+        userTable[AgeColumn],
+        Count(userTable[NameColumn])
+    ).GroupBy(userTable[AgeColumn]).LimitOffset(2).Results();
 
     ASSERT_EQ(results.size(), 2); // 限制只返回 2 組
 }
 
 // 測試 GROUP BY 與 LIMIT OFFSET 組合
 TEST_F(AggregateFunctionTest, GroupByWithLimitOffset) {
-    auto results = db.GetTable<UserTable>().Select(
-        UserTable::TableColumn<AgeColumn>(),
-        Count(UserTable::TableColumn<NameColumn>())
-    ).GroupBy(UserTable::TableColumn<AgeColumn>()).LimitOffset(1, 1).Results();
+    auto results = userTable.Select(
+        userTable[AgeColumn],
+        Count(userTable[NameColumn])
+    ).GroupBy(userTable[AgeColumn]).LimitOffset(1, 1).Results();
 
     ASSERT_EQ(results.size(), 1); // 跳過第一組，只返回 1 組
 }
 
 // 測試複雜的聚合查詢
 TEST_F(AggregateFunctionTest, ComplexAggregateQuery) {
-    auto results = db.GetTable<UserTable>().Select(
-        UserTable::TableColumn<AgeColumn>(),
-        Count(UserTable::TableColumn<NameColumn>()),
-        Sum(UserTable::TableColumn<ScoreColumn>()),
-        Avg(UserTable::TableColumn<ScoreColumn>()),
-        Min(UserTable::TableColumn<ScoreColumn>()),
-        Max(UserTable::TableColumn<ScoreColumn>())
-    ).Where(UserTable::TableColumn<ScoreColumn>() > 75_expr)
-     .GroupBy(UserTable::TableColumn<AgeColumn>())
+    auto results = userTable.Select(
+        userTable[AgeColumn],
+        Count(userTable[NameColumn]),
+        Sum(userTable[ScoreColumn]),
+        Avg(userTable[ScoreColumn]),
+        Min(userTable[ScoreColumn]),
+        Max(userTable[ScoreColumn])
+    ).Where(userTable[ScoreColumn] > 75_expr)
+     .GroupBy(userTable[AgeColumn])
      .Results();
 
     ASSERT_GT(results.size(), 0);
@@ -423,10 +409,10 @@ TEST_F(AggregateFunctionTest, ComplexAggregateQuery) {
 
 // 測試 TOTAL 與 GROUP BY
 TEST_F(AggregateFunctionTest, TotalWithGroupBy) {
-    auto results = db.GetTable<UserTable>().Select(
-        UserTable::TableColumn<AgeColumn>(),
-        Total(UserTable::TableColumn<ScoreColumn>())
-    ).GroupBy(UserTable::TableColumn<AgeColumn>()).Results();
+    auto results = userTable.Select(
+        userTable[AgeColumn],
+        Total(userTable[ScoreColumn])
+    ).GroupBy(userTable[AgeColumn]).Results();
 
     ASSERT_EQ(results.size(), 3);
 
@@ -443,27 +429,27 @@ TEST_F(AggregateFunctionTest, TotalWithGroupBy) {
 
 // 測試空表的 GROUP BY
 TEST_F(AggregateFunctionTest, GroupByOnEmptyTable) {
-    db.GetTable<UserTable>().Delete().Execute();
+    userTable.Delete().Execute();
 
-    auto results = db.GetTable<UserTable>().Select(
-        UserTable::TableColumn<AgeColumn>(),
-        Count(UserTable::TableColumn<NameColumn>())
-    ).GroupBy(UserTable::TableColumn<AgeColumn>()).Results();
+    auto results = userTable.Select(
+        userTable[AgeColumn],
+        Count(userTable[NameColumn])
+    ).GroupBy(userTable[AgeColumn]).Results();
 
     ASSERT_EQ(results.size(), 0); // 空表應該返回空結果
 }
 
 // 測試 GROUP BY 後所有聚合函數
 TEST_F(AggregateFunctionTest, AllAggregateFunctionsWithGroupBy) {
-    auto results = db.GetTable<UserTable>().Select(
-        UserTable::TableColumn<AgeColumn>(),
-        Count(UserTable::TableColumn<NameColumn>()),
-        Sum(UserTable::TableColumn<ScoreColumn>()),
-        Avg(UserTable::TableColumn<ScoreColumn>()),
-        Min(UserTable::TableColumn<ScoreColumn>()),
-        Max(UserTable::TableColumn<ScoreColumn>()),
-        Total(UserTable::TableColumn<ScoreColumn>())
-    ).GroupBy(UserTable::TableColumn<AgeColumn>()).Results();
+    auto results = userTable.Select(
+        userTable[AgeColumn],
+        Count(userTable[NameColumn]),
+        Sum(userTable[ScoreColumn]),
+        Avg(userTable[ScoreColumn]),
+        Min(userTable[ScoreColumn]),
+        Max(userTable[ScoreColumn]),
+        Total(userTable[ScoreColumn])
+    ).GroupBy(userTable[AgeColumn]).Results();
 
     ASSERT_EQ(results.size(), 3);
 
@@ -476,3 +462,4 @@ TEST_F(AggregateFunctionTest, AllAggregateFunctionsWithGroupBy) {
         EXPECT_LE(min, max);
     }
 }
+

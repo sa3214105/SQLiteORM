@@ -3,91 +3,97 @@
 
 // ============ Column Constraints 測試 ============
 
+class ColumnConstraintsTest : public ::testing::Test {
+protected:
+    void TearDown() override {
+        std::remove("test_database.db");
+    }
+};
+
 // 測試 PRIMARY KEY 約束
-TEST(ColumnConstraintsTest, ConstraintPrimaryKey) {
+TEST_F(ColumnConstraintsTest, ConstraintPrimaryKey) {
     using IdColumn = Column<"id", ExprResultType::INTEGER, ColumnPrimaryKey<> >;
-    using TestTable = Table<"test_pk", IdColumn, NameColumn>;
-    Database<TestTable> db("test_database.db", true);
+    auto testTableDef = MakeTableDefinition<"test_pk">(std::make_tuple(IdColumn{}, NameColumn));
+    Database<decltype(testTableDef)> db("test_database.db", testTableDef);
+    auto &testTable = db.GetTable<decltype(testTableDef)>();
 
     // 插入第一筆資料
-    db.GetTable<TestTable>().Insert<TestTable::TableColumn<IdColumn>, TestTable::TableColumn<NameColumn> >(1, "Alice");
+    testTable.Insert<IdColumn, decltype(NameColumn)>(1, "Alice");
 
     // 嘗試插入重複的 PRIMARY KEY，應該失敗
     EXPECT_THROW(
-        (db.GetTable<TestTable>().Insert<TestTable::TableColumn<IdColumn>, TestTable::TableColumn<NameColumn> >(1, "Bob"
-        )),
+        (testTable.Insert<IdColumn, decltype(NameColumn)>(1, "Bob")),
         std::runtime_error
     );
 
     // 驗證只有一筆資料
-    auto results = db.GetTable<TestTable>().Select(TestTable::TableColumn<IdColumn>()).Results();
+    auto results = testTable.Select(testTable[IdColumn{}]).Results();
     EXPECT_EQ(results.size(), 1);
 }
 
 // 測試 PRIMARY KEY 與 DESC 排序
-TEST(ColumnConstraintsTest, ConstraintPrimaryKeyDesc) {
+TEST_F(ColumnConstraintsTest, ConstraintPrimaryKeyDesc) {
     using IdColumn = Column<"id", ExprResultType::INTEGER, ColumnPrimaryKey<OrderType::DESC> >;
-    using TestTable = Table<"test_pk_desc", IdColumn, NameColumn>;
-    Database<TestTable> db("test_database.db", true);
+    auto testTableDef = MakeTableDefinition<"test_pk_desc">(std::make_tuple(IdColumn{}, NameColumn));
+    Database<decltype(testTableDef)> db("test_database.db", testTableDef);
+    auto &testTable = db.GetTable<decltype(testTableDef)>();
 
-    db.GetTable<TestTable>().Insert<TestTable::TableColumn<IdColumn>, TestTable::TableColumn<NameColumn> >(1, "First");
-    db.GetTable<TestTable>().Insert<TestTable::TableColumn<IdColumn>, TestTable::TableColumn<NameColumn> >(2, "Second");
+    testTable.Insert<IdColumn, decltype(NameColumn)>(1, "First");
+    testTable.Insert<IdColumn, decltype(NameColumn)>(2, "Second");
 
-    auto results = db.GetTable<TestTable>().Select(TestTable::TableColumn<IdColumn>()).Results();
+    auto results = testTable.Select(testTable[IdColumn{}]).Results();
     EXPECT_EQ(results.size(), 2);
 }
 
 // 測試 NOT NULL 約束
-TEST(ColumnConstraintsTest, ConstraintNotNull) {
+TEST_F(ColumnConstraintsTest, ConstraintNotNull) {
     using EmailColumn = Column<"email", ExprResultType::TEXT, ColumnNotNull<> >;
-    using TestTable = Table<"test_not_null", NameColumn, EmailColumn>;
-    Database<TestTable> db("test_database.db", true);
+    auto testTableDef = MakeTableDefinition<"test_not_null">(std::make_tuple(NameColumn, EmailColumn{}));
+    Database<decltype(testTableDef)> db("test_database.db", testTableDef);
+    auto &testTable = db.GetTable<decltype(testTableDef)>();
 
     // 插入有效資料
-    db.GetTable<TestTable>().Insert<TestTable::TableColumn<NameColumn>, TestTable::TableColumn<EmailColumn> >(
-        "Alice", "alice@example.com");
+    testTable.Insert<decltype(NameColumn), EmailColumn>("Alice", "alice@example.com");
 
-    auto results = db.GetTable<TestTable>().Select(TestTable::TableColumn<EmailColumn>()).Results();
+    auto results = testTable.Select(testTable[EmailColumn{}]).Results();
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<0>(results[0]), "alice@example.com");
 }
 
 // 測試 UNIQUE 約束
-TEST(ColumnConstraintsTest, ConstraintUnique) {
+TEST_F(ColumnConstraintsTest, ConstraintUnique) {
     using UsernameColumn = Column<"username", ExprResultType::TEXT, ColumnUnique<> >;
-    using TestTable = Table<"test_unique", UsernameColumn, AgeColumn>;
-    Database<TestTable> db("test_database.db", true);
+    auto testTableDef = MakeTableDefinition<"test_unique">(std::make_tuple(UsernameColumn{}, AgeColumn));
+    Database<decltype(testTableDef)> db("test_database.db", testTableDef);
+    auto &testTable = db.GetTable<decltype(testTableDef)>();
 
     // 插入第一筆資料
-    db.GetTable<TestTable>().Insert<TestTable::TableColumn<UsernameColumn>, TestTable::TableColumn<AgeColumn> >(
-        "alice123", 25);
+    testTable.Insert<UsernameColumn, decltype(AgeColumn)>("alice123", 25);
 
     // 嘗試插入重複的 UNIQUE 值，應該失敗
     EXPECT_THROW(
-        (db.GetTable<TestTable>().Insert<TestTable::TableColumn<UsernameColumn>,TestTable::TableColumn<AgeColumn> >(
-            "alice123", 30)),
+        (testTable.Insert<UsernameColumn, decltype(AgeColumn)>("alice123", 30)),
         std::runtime_error
     );
 
     // 插入不同的值應該成功
-    db.GetTable<TestTable>().Insert<TestTable::TableColumn<UsernameColumn>, TestTable::TableColumn<
-        AgeColumn> >("bob456", 30);
+    testTable.Insert<UsernameColumn, decltype(AgeColumn)>("bob456", 30);
 
-    auto results = db.GetTable<TestTable>().Select(TestTable::TableColumn<UsernameColumn>()).Results();
+    auto results = testTable.Select(testTable[UsernameColumn{}]).Results();
     EXPECT_EQ(results.size(), 2);
 }
 
 // 測試 DEFAULT 約束（整數）
-TEST(ColumnConstraintsTest, ConstraintDefaultInteger) {
+TEST_F(ColumnConstraintsTest, ConstraintDefaultInteger) {
     using StatusColumn = Column<"status", ExprResultType::INTEGER, Default<0> >;
-    using TestTable = Table<"test_default_int", NameColumn, StatusColumn>;
-    Database<TestTable> db("test_database.db", true);
+    auto testTableDef = MakeTableDefinition<"test_default_int">(std::make_tuple(NameColumn, StatusColumn{}));
+    Database<decltype(testTableDef)> db("test_database.db", testTableDef);
+    auto &testTable = db.GetTable<decltype(testTableDef)>();
 
     // 只插入 name，status 應該使用預設值
-    db.GetTable<TestTable>().Insert<TestTable::TableColumn<NameColumn> >("Alice");
+    testTable.Insert<decltype(NameColumn)>("Alice");
 
-    auto results = db.GetTable<TestTable>().Select(TestTable::TableColumn<NameColumn>(),
-                                                   TestTable::TableColumn<StatusColumn>()).Results();
+    auto results = testTable.Select(testTable[NameColumn], testTable[StatusColumn{}]).Results();
 
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<0>(results[0]), "Alice");
@@ -95,16 +101,16 @@ TEST(ColumnConstraintsTest, ConstraintDefaultInteger) {
 }
 
 // 測試 DEFAULT 約束（字串）
-TEST(ColumnConstraintsTest, ConstraintDefaultString) {
+TEST_F(ColumnConstraintsTest, ConstraintDefaultString) {
     using CountryColumn = Column<"country", ExprResultType::TEXT, Default<"Taiwan"> >;
-    using TestTable = Table<"test_default_str", NameColumn, CountryColumn>;
-    Database<TestTable> db("test_database.db", true);
+    auto testTableDef = MakeTableDefinition<"test_default_str">(std::make_tuple(NameColumn, CountryColumn{}));
+    Database<decltype(testTableDef)> db("test_database.db", testTableDef);
+    auto &testTable = db.GetTable<decltype(testTableDef)>();
 
     // 只插入 name
-    db.GetTable<TestTable>().Insert<TestTable::TableColumn<NameColumn> >("Alice");
+    testTable.Insert<decltype(NameColumn)>("Alice");
 
-    auto results = db.GetTable<TestTable>().Select(TestTable::TableColumn<NameColumn>(),
-                                                   TestTable::TableColumn<CountryColumn>()).Results();
+    auto results = testTable.Select(testTable[NameColumn], testTable[CountryColumn{}]).Results();
 
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<0>(results[0]), "Alice");
@@ -112,124 +118,124 @@ TEST(ColumnConstraintsTest, ConstraintDefaultString) {
 }
 
 // 測試組合約束：PRIMARY KEY + NOT NULL
-TEST(ColumnConstraintsTest, ConstraintCombinationPrimaryKeyNotNull) {
+TEST_F(ColumnConstraintsTest, ConstraintCombinationPrimaryKeyNotNull) {
     using IdColumn = Column<"id", ExprResultType::INTEGER, ColumnPrimaryKey<>, ColumnNotNull<> >;
-    using TestTable = Table<"test_pk_nn", IdColumn, NameColumn>;
-    Database<TestTable> db("test_database.db", true);
+    auto testTableDef = MakeTableDefinition<"test_pk_nn">(std::make_tuple(IdColumn{}, NameColumn));
+    Database<decltype(testTableDef)> db("test_database.db", testTableDef);
+    auto &testTable = db.GetTable<decltype(testTableDef)>();
 
-    db.GetTable<TestTable>().Insert<TestTable::TableColumn<IdColumn>, TestTable::TableColumn<NameColumn> >(1, "Alice");
+    testTable.Insert<IdColumn, decltype(NameColumn)>(1, "Alice");
 
     // 嘗試插入重複 ID 應該失敗
     EXPECT_THROW(
-        (db.GetTable<TestTable>().Insert<TestTable::TableColumn<IdColumn>,TestTable::TableColumn<NameColumn> >(1, "Bob")),
+        (testTable.Insert<IdColumn, decltype(NameColumn)>(1, "Bob")),
         std::runtime_error
     );
 
-    auto results = db.GetTable<TestTable>().Select(TestTable::TableColumn<IdColumn>()).Results();
+    auto results = testTable.Select(testTable[IdColumn{}]).Results();
     EXPECT_EQ(results.size(), 1);
 }
 
 // 測試組合約束：UNIQUE + NOT NULL
-TEST(ColumnConstraintsTest, ConstraintCombinationUniqueNotNull) {
+TEST_F(ColumnConstraintsTest, ConstraintCombinationUniqueNotNull) {
     using EmailColumn = Column<"email", ExprResultType::TEXT, ColumnUnique<>, ColumnNotNull<> >;
-    using TestTable = Table<"test_uniq_nn", NameColumn, EmailColumn>;
-    Database<TestTable> db("test_database.db", true);
+    auto testTableDef = MakeTableDefinition<"test_uniq_nn">(std::make_tuple(NameColumn, EmailColumn{}));
+    Database<decltype(testTableDef)> db("test_database.db", testTableDef);
+    auto &testTable = db.GetTable<decltype(testTableDef)>();
 
-    db.GetTable<TestTable>().Insert<TestTable::TableColumn<NameColumn>, TestTable::TableColumn<EmailColumn> >(
-        "Alice", "alice@test.com");
+    testTable.Insert<decltype(NameColumn), EmailColumn>("Alice", "alice@test.com");
 
     // 嘗試插入重複的 email
     EXPECT_THROW(
-        (db.GetTable<TestTable>().Insert<TestTable::TableColumn<NameColumn>,TestTable::TableColumn<EmailColumn> >("Bob", "alice@test.com")),
+        (testTable.Insert<decltype(NameColumn), EmailColumn>("Bob", "alice@test.com")),
         std::runtime_error
     );
 
     // 插入不同的 email 應該成功
-    db.GetTable<TestTable>().Insert<TestTable::TableColumn<NameColumn>, TestTable::TableColumn<EmailColumn> >(
-        "Bob", "bob@test.com");
+    testTable.Insert<decltype(NameColumn), EmailColumn>("Bob", "bob@test.com");
 
-    auto results = db.GetTable<TestTable>().Select(TestTable::TableColumn<EmailColumn>()).Results();
+    auto results = testTable.Select(testTable[EmailColumn{}]).Results();
     EXPECT_EQ(results.size(), 2);
 }
 
 // 測試 PRIMARY KEY 與 ON CONFLICT REPLACE
-TEST(ColumnConstraintsTest, ConstraintPrimaryKeyConflictReplace) {
+TEST_F(ColumnConstraintsTest, ConstraintPrimaryKeyConflictReplace) {
     using IdColumn = Column<"id", ExprResultType::INTEGER, ColumnPrimaryKey<OrderType::ASC, ConflictCause::REPLACE> >;
-    using TestTable = Table<"test_pk_replace", IdColumn, NameColumn>;
-    Database<TestTable> db("test_database.db", true);
+    auto testTableDef = MakeTableDefinition<"test_pk_replace">(std::make_tuple(IdColumn{}, NameColumn));
+    Database<decltype(testTableDef)> db("test_database.db", testTableDef);
+    auto &testTable = db.GetTable<decltype(testTableDef)>();
 
-    db.GetTable<TestTable>().Insert<TestTable::TableColumn<IdColumn>, TestTable::TableColumn<NameColumn> >(1, "Alice");
+    testTable.Insert<IdColumn, decltype(NameColumn)>(1, "Alice");
 
     // 插入重複 ID，應該替換舊資料
-    db.GetTable<TestTable>().Insert<TestTable::TableColumn<IdColumn>, TestTable::TableColumn<NameColumn> >(1, "Bob");
+    testTable.Insert<IdColumn, decltype(NameColumn)>(1, "Bob");
 
-    auto results = db.GetTable<TestTable>().Select(TestTable::TableColumn<IdColumn>(),
-                                                   TestTable::TableColumn<NameColumn>()).Results();
+    auto results = testTable.Select(testTable[IdColumn{}], testTable[NameColumn]).Results();
 
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<1>(results[0]), "Bob");
 }
 
 // 測試 UNIQUE 與 ON CONFLICT IGNORE
-TEST(ColumnConstraintsTest, ConstraintUniqueConflictIgnore) {
+TEST_F(ColumnConstraintsTest, ConstraintUniqueConflictIgnore) {
     using EmailColumn = Column<"email", ExprResultType::TEXT, ColumnUnique<ConflictCause::IGNORE> >;
-    using TestTable = Table<"test_uniq_ignore", NameColumn, EmailColumn>;
-    Database<TestTable> db("test_database.db", true);
+    auto testTableDef = MakeTableDefinition<"test_uniq_ignore">(std::make_tuple(NameColumn, EmailColumn{}));
+    Database<decltype(testTableDef)> db("test_database.db", testTableDef);
+    auto &testTable = db.GetTable<decltype(testTableDef)>();
 
-    db.GetTable<TestTable>().Insert<TestTable::TableColumn<NameColumn>, TestTable::TableColumn<EmailColumn> >(
-        "Alice", "same@test.com");
+    testTable.Insert<decltype(NameColumn), EmailColumn>("Alice", "same@test.com");
 
     // 插入重複值，應該被忽略（不拋出異常）
-    db.GetTable<TestTable>().Insert<TestTable::TableColumn<NameColumn>, TestTable::TableColumn<EmailColumn> >(
-        "Bob", "same@test.com");
+    testTable.Insert<decltype(NameColumn), EmailColumn>("Bob", "same@test.com");
 
-    auto results = db.GetTable<TestTable>().Select(TestTable::TableColumn<NameColumn>()).Results();
+    auto results = testTable.Select(testTable[NameColumn]).Results();
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<0>(results[0]), "Alice");
 }
 
 // 測試 NOT NULL 與 ON CONFLICT FAIL
-TEST(ColumnConstraintsTest, ConstraintNotNullConflictFail) {
+TEST_F(ColumnConstraintsTest, ConstraintNotNullConflictFail) {
     using RequiredColumn = Column<"required_field", ExprResultType::TEXT, ColumnNotNull<ConflictCause::FAIL> >;
-    using TestTable = Table<"test_nn_fail", NameColumn, RequiredColumn>;
-    Database<TestTable> db("test_database.db", true);
+    auto testTableDef = MakeTableDefinition<"test_nn_fail">(std::make_tuple(NameColumn, RequiredColumn{}));
+    Database<decltype(testTableDef)> db("test_database.db", testTableDef);
+    auto &testTable = db.GetTable<decltype(testTableDef)>();
 
     // 插入有效資料
-    db.GetTable<TestTable>().Insert<TestTable::TableColumn<NameColumn>, TestTable::TableColumn<RequiredColumn> >(
-        "Alice", "value");
+    testTable.Insert<decltype(NameColumn), RequiredColumn>("Alice", "value");
 
-    auto results = db.GetTable<TestTable>().Select(TestTable::TableColumn<RequiredColumn>()).Results();
+    auto results = testTable.Select(testTable[RequiredColumn{}]).Results();
     EXPECT_EQ(results.size(), 1);
 }
 
 // 測試複雜的組合約束
-TEST(ColumnConstraintsTest, ConstraintComplexCombination) {
+TEST_F(ColumnConstraintsTest, ConstraintComplexCombination) {
     using IdColumn = Column<"id", ExprResultType::INTEGER, ColumnPrimaryKey<> >;
     using EmailColumn = Column<"email", ExprResultType::TEXT, ColumnUnique<>, ColumnNotNull<> >;
     using StatusColumn = Column<"status", ExprResultType::INTEGER, Default<1> >;
-    using TestTable = Table<"test_complex", IdColumn, NameColumn, EmailColumn, StatusColumn>;
-    Database<TestTable> db("test_database.db", true);
+    auto testTableDef = MakeTableDefinition<"test_complex">(std::make_tuple(IdColumn{}, NameColumn, EmailColumn{}, StatusColumn{}));
+    Database<decltype(testTableDef)> db("test_database.db", testTableDef);
+    auto &testTable = db.GetTable<decltype(testTableDef)>();
 
     // 插入完整資料
-    db.GetTable<TestTable>().Insert<
-        TestTable::TableColumn<IdColumn>,
-        TestTable::TableColumn<NameColumn>,
-        TestTable::TableColumn<EmailColumn>,
-        TestTable::TableColumn<StatusColumn>
+    testTable.Insert<
+        IdColumn,
+        decltype(NameColumn),
+        EmailColumn,
+        StatusColumn
     >(1, "Alice", "alice@test.com", 5);
 
     // 插入部分資料，status 使用預設值
-    db.GetTable<TestTable>().Insert<
-        TestTable::TableColumn<IdColumn>,
-        TestTable::TableColumn<NameColumn>,
-        TestTable::TableColumn<EmailColumn>
+    testTable.Insert<
+        IdColumn,
+        decltype(NameColumn),
+        EmailColumn
     >(2, "Bob", "bob@test.com");
 
-    auto results = db.GetTable<TestTable>().Select(
-        TestTable::TableColumn<IdColumn>(),
-        TestTable::TableColumn<NameColumn>(),
-        TestTable::TableColumn<EmailColumn>(),
-        TestTable::TableColumn<StatusColumn>()
+    auto results = testTable.Select(
+        testTable[IdColumn{}],
+        testTable[NameColumn],
+        testTable[EmailColumn{}],
+        testTable[StatusColumn{}]
     ).Results();
 
     EXPECT_EQ(results.size(), 2);
@@ -244,15 +250,15 @@ TEST(ColumnConstraintsTest, ConstraintComplexCombination) {
 }
 
 // 測試實數型的 DEFAULT 約束
-TEST(ColumnConstraintsTest, ConstraintDefaultReal) {
+TEST_F(ColumnConstraintsTest, ConstraintDefaultReal) {
     using RatingColumn = Column<"rating", ExprResultType::REAL, Default<5.0> >;
-    using TestTable = Table<"test_default_real", NameColumn, RatingColumn>;
-    Database<TestTable> db("test_database.db", true);
+    auto testTableDef = MakeTableDefinition<"test_default_real">(std::make_tuple(NameColumn, RatingColumn{}));
+    Database<decltype(testTableDef)> db("test_database.db", testTableDef);
+    auto &testTable = db.GetTable<decltype(testTableDef)>();
 
-    db.GetTable<TestTable>().Insert<TestTable::TableColumn<NameColumn> >("Product1");
+    testTable.Insert<decltype(NameColumn)>("Product1");
 
-    auto results = db.GetTable<TestTable>().Select(TestTable::TableColumn<NameColumn>(),
-                                                   TestTable::TableColumn<RatingColumn>()).Results();
+    auto results = testTable.Select(testTable[NameColumn], testTable[RatingColumn{}]).Results();
 
     EXPECT_EQ(results.size(), 1);
     EXPECT_DOUBLE_EQ(std::get<1>(results[0]), 5.0);

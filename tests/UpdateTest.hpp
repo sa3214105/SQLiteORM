@@ -1,42 +1,50 @@
 #pragma once
 #include "Common.hpp"
+
+class UpdateTest : public ::testing::Test {
+protected:
+    Database<decltype(UserTableDefinition)> db = Database{"test_database.db", UserTableDefinition};
+    Table<decltype(UserTableDefinition)> &userTable = db.GetTable<decltype(UserTableDefinition)>();
+
+    void SetUp() override {
+        // 每個測試前會重新建立資料庫
+    }
+
+    void TearDown() override {
+        std::remove("test_database.db");
+    }
+};
+
 // ============ Update 測試 ============
-TEST(UpdateTest, UpdateSingleColumn) {
-    Database<UserTable> db("test_database.db", true);
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn> >("OldName");
+TEST_F(UpdateTest, UpdateSingleColumn) {
+    userTable.Insert<decltype(NameColumn)>("OldName");
 
-    db.GetTable<UserTable>().Update<UserTable::TableColumn<NameColumn> >("NewName")
-            .Where(UserTable::TableColumn<NameColumn>() == "OldName"_expr).Execute();
+    userTable.Update<decltype(NameColumn)>("NewName")
+            .Where(userTable[NameColumn] == "OldName"_expr).Execute();
 
-    auto results = db.GetTable<UserTable>().Select(UserTable::TableColumn<NameColumn>()).Results();
+    auto results = userTable.Select(userTable[NameColumn]).Results();
     EXPECT_EQ(std::get<0>(results[0]), "NewName");
 }
 
-TEST(UpdateTest, UpdateMultipleColumns) {
-    Database<UserTable> db("test_database.db", true);
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>, UserTable::TableColumn<
-        AgeColumn> >("Alice", 20);
+TEST_F(UpdateTest, UpdateMultipleColumns) {
+    userTable.Insert<decltype(NameColumn), decltype(AgeColumn)>("Alice", 20);
 
-    db.GetTable<UserTable>().Update<UserTable::TableColumn<NameColumn>, UserTable::TableColumn<AgeColumn> >("Bob", 30).
-            Where(UserTable::TableColumn<NameColumn>() == "Alice"_expr).Execute();
+    userTable.Update<decltype(NameColumn), decltype(AgeColumn)>("Bob", 30)
+            .Where(userTable[NameColumn] == "Alice"_expr).Execute();
 
-    auto results = db.GetTable<UserTable>().Select(UserTable::TableColumn<NameColumn>(), UserTable::TableColumn<
-                                                       AgeColumn>()).Results();
+    auto results = userTable.Select(userTable[NameColumn], userTable[AgeColumn]).Results();
     EXPECT_EQ(std::get<0>(results[0]), "Bob");
     EXPECT_EQ(std::get<1>(results[0]), 30);
 }
 
-TEST(UpdateTest, UpdateMultipleRows) {
-    Database<UserTable> db("test_database.db", true);
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>,
-        UserTable::TableColumn<AgeColumn> >("Alice", 25);
-    db.GetTable<UserTable>().Insert<UserTable::TableColumn<NameColumn>,
-        UserTable::TableColumn<AgeColumn> >("Bob", 25);
+TEST_F(UpdateTest, UpdateMultipleRows) {
+    userTable.Insert<decltype(NameColumn), decltype(AgeColumn)>("Alice", 25);
+    userTable.Insert<decltype(NameColumn), decltype(AgeColumn)>("Bob", 25);
 
-    db.GetTable<UserTable>().Update<UserTable::TableColumn<AgeColumn>>(30)
-            .Where(UserTable::TableColumn<AgeColumn>() == 25_expr).Execute();
+    userTable.Update<decltype(AgeColumn)>(30)
+            .Where(userTable[AgeColumn] == 25_expr).Execute();
 
-    auto results = db.GetTable<UserTable>().Select(UserTable::TableColumn<AgeColumn>()).Results();
+    auto results = userTable.Select(userTable[AgeColumn]).Results();
     EXPECT_EQ(results.size(), 2);
     EXPECT_EQ(std::get<0>(results[0]), 30);
     EXPECT_EQ(std::get<0>(results[1]), 30);

@@ -4,10 +4,13 @@
 
 namespace TypeSQLite {
     // Helper structure to pair a column with its order
-    template<ColumnOrTableColumnConcept Column, OrderType order = OrderType::ASC>
+    template<ColumnOrTableColumnConcept Column>
     struct ColumnWithOrder {
-        using column = Column;
-        constexpr static OrderType orderType = order;
+        Column column;
+        OrderType order;
+        ColumnWithOrder(Column column, OrderType order)
+            : column(column), order(order) {
+        }
     };
 
     // Helper to check if type is ColumnWithOrder
@@ -15,51 +18,55 @@ namespace TypeSQLite {
     struct IsColumnWithOrder : std::false_type {
     };
 
-    template<ColumnOrTableColumnConcept Col, OrderType order>
-    struct IsColumnWithOrder<ColumnWithOrder<Col, order>> : std::true_type {
+    template<ColumnOrTableColumnConcept Col>
+    struct IsColumnWithOrder<ColumnWithOrder<Col> > : std::true_type {
     };
 
     // Helper to convert a single column/ColumnWithOrder to its name with order
     template<typename T>
-    constexpr auto GetColumnNameWithOrder() {
+    auto GetColumnNameWithOrder(T t) {
         if constexpr (IsColumnWithOrder<T>::value) {
-            return GetColumnName<typename T::column>() + OrderTypeToString<T::orderType>();
+            return GetColumnName(t.column) + OrderTypeToString(t.order);
         } else if constexpr (ColumnOrTableColumnConcept<T>) {
-            return GetColumnName<T>(); // No order specified, default behavior
+            return GetColumnName(t); // No order specified, default behavior
         } else {
             static_assert(ColumnOrTableColumnConcept<T> || IsColumnWithOrder<T>::value,
-                         "Type must be Column or ColumnWithOrder");
+                          "Type must be Column or ColumnWithOrder");
         }
     }
 
-    // Helper to generate column names with orders from TypeGroup
-    template<typename TG>
-    constexpr auto GetNamesWithOrdersFromTypeGroup() {
-        if constexpr (std::is_same_v<TG, TypeGroup<>>) {
-            return FixedString("");
-        } else if constexpr (!std::is_same_v<typename TG::next, TypeGroup<>>) {
-            return GetColumnNameWithOrder<typename TG::type>() + FixedString(",") +
-                   GetNamesWithOrdersFromTypeGroup<typename TG::next>();
+    template<typename T, typename... Ts>
+    constexpr auto GetColumnsNameWithOrder(T t, Ts... ts) {
+        if constexpr (sizeof...(ts) == 0) {
+            return GetColumnNameWithOrder(t);
         } else {
-            return GetColumnNameWithOrder<typename TG::type>();
+            return GetColumnNameWithOrder(t) + FixedString(",") + GetColumnsNameWithOrder(ts...);
         }
     }
 
     //TODO COLLATE 暫時不實作
-    template<typename Columns, ConflictCause conflictCause = ConflictCause::ABORT>
+    template<typename Columns>
     struct TablePrimaryKey {
-        constexpr static FixedString value = FixedString("PRIMARY KEY(") +
-                                            GetNamesWithOrdersFromTypeGroup<Columns>() +
-                                            FixedString(")") +
-                                            ConflictCauseToString<conflictCause>();
+        const std::string value;
+
+        explicit TablePrimaryKey(Columns columns, ConflictCause conflictCause = ConflictCause::ABORT)
+            : value(std::string("PRIMARY KEY(") +
+                    std::apply([](auto... columns) { return GetColumnsNameWithOrder(columns...); }, columns) +
+                    std::string(")") +
+                    ConflictCauseToString(conflictCause)) {
+        }
     };
 
-    template<typename Columns, ConflictCause conflictCause = ConflictCause::ABORT>
+    template<typename Columns>
     struct TableUnique {
-        constexpr static FixedString value = FixedString("UNIQUE(") +
-                                            GetNamesWithOrdersFromTypeGroup<Columns>() +
-                                            FixedString(")") +
-                                            ConflictCauseToString<conflictCause>();
+        const std::string value;
+
+        explicit TableUnique(Columns columns, ConflictCause conflictCause = ConflictCause::ABORT)
+            : value(std::string("UNIQUE(") +
+                    std::apply([](auto... columns) { return GetColumnsNameWithOrder(columns...); }, columns) +
+                    std::string(")") +
+                    ConflictCauseToString(conflictCause)) {
+        }
     };
 
     //TODO CHECK暫時不實作
@@ -79,12 +86,12 @@ namespace TypeSQLite {
     struct IsTableConstraint : std::false_type {
     };
 
-    template<typename Columns, ConflictCause conflictCause>
-    struct IsTableConstraint<TablePrimaryKey<Columns, conflictCause>> : std::true_type {
+    template<typename Columns>
+    struct IsTableConstraint<TablePrimaryKey<Columns> > : std::true_type {
     };
 
-    template<typename Columns, ConflictCause conflictCause>
-    struct IsTableConstraint<TableUnique<Columns, conflictCause>> : std::true_type {
+    template<typename Columns>
+    struct IsTableConstraint<TableUnique<Columns> > : std::true_type {
     };
 
     template<typename T>
@@ -110,5 +117,6 @@ namespace TypeSQLite {
     concept ColumnOrTableConstraintConcept = ColumnConcept<T> || TableConstraintConcept<T>;
 
     template<typename T>
-    concept ColumnOrTableConstraintOrOptionConcept = ColumnConcept<T> || TableConstraintConcept<T> || TableOptionConcept<T>;
+    concept ColumnOrTableConstraintOrOptionConcept =
+            ColumnConcept<T> || TableConstraintConcept<T> || TableOptionConcept<T>;
 }

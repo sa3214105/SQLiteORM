@@ -21,40 +21,40 @@ namespace TypeSQLite {
     };
 
     // Helper to filter only table constraints from a parameter pack
-    template<typename... Items>
-    struct FilterTableConstraints;
-
-    template<>
-    struct FilterTableConstraints<> {
-        using type = TypeGroup<>;
-    };
-
-    template<typename T, typename... Rest>
-    struct FilterTableConstraints<T, Rest...> {
-        using type = std::conditional_t<
-            TableConstraintConcept<T>,
-            typename ConcatTypeGroup<TypeGroup<T>, typename FilterTableConstraints<Rest...>::type>::type,
-            typename FilterTableConstraints<Rest...>::type
-        >;
-    };
-
-    // Helper to filter only table options from a parameter pack
-    template<typename... Items>
-    struct FilterTableOptions;
-
-    template<>
-    struct FilterTableOptions<> {
-        using type = TypeGroup<>;
-    };
-
-    template<typename T, typename... Rest>
-    struct FilterTableOptions<T, Rest...> {
-        using type = std::conditional_t<
-            TableOptionConcept<T>,
-            typename ConcatTypeGroup<TypeGroup<T>, typename FilterTableOptions<Rest...>::type>::type,
-            typename FilterTableOptions<Rest...>::type
-        >;
-    };
+    // template<typename... Items>
+    // struct FilterTableConstraints;
+    //
+    // template<>
+    // struct FilterTableConstraints<> {
+    //     using type = TypeGroup<>;
+    // };
+    //
+    // template<typename T, typename... Rest>
+    // struct FilterTableConstraints<T, Rest...> {
+    //     using type = std::conditional_t<
+    //         TableConstraintConcept<T>,
+    //         typename ConcatTypeGroup<TypeGroup<T>, typename FilterTableConstraints<Rest...>::type>::type,
+    //         typename FilterTableConstraints<Rest...>::type
+    //     >;
+    // };
+    //
+    // // Helper to filter only table options from a parameter pack
+    // template<typename... Items>
+    // struct FilterTableOptions;
+    //
+    // template<>
+    // struct FilterTableOptions<> {
+    //     using type = TypeGroup<>;
+    // };
+    //
+    // template<typename T, typename... Rest>
+    // struct FilterTableOptions<T, Rest...> {
+    //     using type = std::conditional_t<
+    //         TableOptionConcept<T>,
+    //         typename ConcatTypeGroup<TypeGroup<T>, typename FilterTableOptions<Rest...>::type>::type,
+    //         typename FilterTableOptions<Rest...>::type
+    //     >;
+    // };
 
     // Helper to extract column types from TypeGroup as parameter pack
     template<typename TG>
@@ -89,6 +89,15 @@ namespace TypeSQLite {
         }
     }
 
+    template<typename T, typename... Ts>
+    std::string GetTableConstraintSQLFromPack(T t, Ts... ts) {
+        if constexpr (sizeof...(Ts) == 0) {
+            return ", " + std::string(t.value);
+        } else {
+            return ", " + std::string(t.value) + GetTableConstraintSQLFromPack(ts...);
+        }
+    }
+
     // Helper to generate table options SQL from TypeGroup (applied after closing parenthesis)
     template<typename OptionsTG>
     std::string GetTableOptionsSQL() {
@@ -101,6 +110,15 @@ namespace TypeSQLite {
                 result += "," + GetTableOptionsSQL<typename OptionsTG::next>();
             }
             return result;
+        }
+    }
+
+    template<typename T, typename... Ts>
+    std::string GetTableOptionsSQLFromPack() {
+        if constexpr (sizeof...(Ts) == 0) {
+            return std::string(T::value);
+        } else {
+            return std::string(T::value) + "," + GetTableOptionsSQLFromPack<Ts...>();
         }
     }
 
@@ -119,9 +137,47 @@ namespace TypeSQLite {
         }
     }
 
-    // Forward declaration
-    template<FixedString TableName, ColumnOrTableConstraintOrOptionConcept... Items>
-    class Table;
+    template<typename T, typename... Ts>
+    std::string GetColumnDefinitionFromPack() {
+        if constexpr (sizeof...(Ts) == 0) {
+            return GetColumnDefinition<T>();
+        } else {
+            return GetColumnDefinition<T>() + "," + GetColumnDefinitionFromPack<Ts...>();
+        }
+    }
+
+    template<
+        FixedString Name,
+        typename ColumTypes= std::tuple<>,
+        typename TableConstraints= std::tuple<>,
+        typename TableOptions=std::tuple<> >
+    struct TableDefinition {
+        constexpr static FixedString name = Name;
+        ColumTypes columns;
+        TableConstraints tableConstraints;
+        TableOptions tableOptions;
+    };
+
+    template<FixedString Name, typename ColumTypes, typename TableConstraints = std::tuple<>, typename TableOptions =
+        std::tuple<> >
+    constexpr auto MakeTableDefinition(ColumTypes columns,
+                                       TableConstraints tableConstraints = std::make_tuple(),
+                                       TableOptions tableOptions = std::make_tuple()) {
+        return TableDefinition<Name, ColumTypes, TableConstraints, TableOptions>{
+            .columns = columns, .tableConstraints = tableConstraints, .tableOptions = tableOptions
+        };
+    }
+
+    template<typename>
+    struct IsTableDefinition : std::false_type {
+    };
+
+    template<FixedString Name, typename ColumTypes, typename TableConstraints, typename TableOptions>
+    struct IsTableDefinition<TableDefinition<Name, ColumTypes, TableConstraints, TableOptions> > : std::true_type {
+    };
+
+    template<typename T>
+    concept TableDefinitionConcept = IsTableDefinition<T>::value;
 
     // Helper to generate TableColumn TypeGroup from filtered columns
     template<typename TableType, typename ColumnsTG>
@@ -132,29 +188,19 @@ namespace TypeSQLite {
         using type = TypeGroup<TableColumn_Base<TableType, Columns>...>;
     };
 
-    template<FixedString TableName, ColumnOrTableConstraintOrOptionConcept... Items>
-    class Table final : public QueryAble<
-                typename GenerateTableColumns<
-                    Table<TableName, Items...>,
-                    typename FilterColumns<Items...>::type
-                >::type,
-                SourceInfo<Table<TableName, Items...> > > {
-    private:
-        using FilteredColumns = typename FilterColumns<Items...>::type;
-        using FilteredConstraints = typename FilterTableConstraints<Items...>::type;
-        using FilteredOptions = typename FilterTableOptions<Items...>::type;
-
+    template<typename TableDef>
+    class Table final : public QueryAble<decltype(std::declval<TableDef>().columns), SourceInfo<Table<TableDef> > > {
     public:
         template<ColumnConcept Col>
         using TableColumn = TableColumn_Base<Table, Col>;
-        constexpr static FixedString name = TableName;
-        using columns = typename GenerateTableColumns<Table, FilteredColumns>::type;
-        using Source = SourceInfo<Table>;
+        constexpr static FixedString name = TableDef::name;
+        TableDef _tableDef;
+        const decltype(_tableDef.columns) columns;
 
     private:
         SQLiteWrapper &_sqlite;
 
-        template<typename _Where, TableColumnConcept... Ts>
+        template<typename _Where, ColumnOrTableColumnConcept... Ts>
         class UpdateStatement {
             const Table &_table;
             std::tuple<ExprResultValueType<Ts>...> datas;
@@ -174,7 +220,8 @@ namespace TypeSQLite {
             }
 
             void Execute() {
-                auto sql = std::string("UPDATE ") + std::string(name) + " SET " + GetUpdateField<Ts...>();
+                auto sql = std::string("UPDATE ") + std::string(name) + " SET " + GetUpdateField<Ts
+                               ...>();
                 if constexpr (!std::is_null_pointer_v<_Where>) {
                     sql += " WHERE " + _where.sql;
                 }
@@ -226,22 +273,54 @@ namespace TypeSQLite {
         };
 
     public:
-        explicit Table(SQLiteWrapper &sqlite) : QueryAble<columns, Source>(sqlite, Source()),
-                                                _sqlite(sqlite) {
+        explicit Table(SQLiteWrapper &sqlite, TableDef table_def) : QueryAble<decltype(table_def.columns), SourceInfo<
+                                                                        Table> >(sqlite, table_def.columns,
+                                                                        SourceInfo<Table>()), _tableDef(table_def),
+                                                                    columns(table_def.columns),
+                                                                    _sqlite(sqlite) {
             std::string sql = std::string("CREATE TABLE IF NOT EXISTS ") + std::string(name) + " (";
-            sql += GetColumnDefinitionsFromTypeGroup<FilteredColumns>();
-            sql += GetTableConstraintSQL<FilteredConstraints>();
+
+            // 添加列定義
+            sql += std::apply([](auto... cols) {
+                                  if constexpr (sizeof ...(cols) == 0) {
+                                      return "";
+                                  } else {
+                                      return GetColumnDefinitionFromPack<decltype(cols)...>();
+                                  }
+                              },
+                              _tableDef.columns);
+
+            // 添加表約束（GetTableConstraintSQLFromPack 已經包含前導逗號）
+            sql += std::apply([](auto... tableConstraints) {
+                                  if constexpr (sizeof...(tableConstraints) == 0) {
+                                      return "";
+                                  } else {
+                                      return GetTableConstraintSQLFromPack(tableConstraints...);
+                                  }
+                              },
+                              _tableDef.tableConstraints
+            );
+
             sql += ")";
-            sql += GetTableOptionsSQL<FilteredOptions>();
+
+            // 添加表選項（在括號外面）
+            sql += std::apply([](auto... tableOptions) {
+                                  if constexpr (sizeof...(tableOptions) == 0) {
+                                      return "";
+                                  } else {
+                                      return " " + GetTableOptionsSQLFromPack<decltype(tableOptions)...>();
+                                  }
+                              },
+                              _tableDef.tableOptions);
             sql += ";";
             sqlite.Execute(sql);
         }
 
         //TODO 支援批量插入
-        template<TableColumnConcept... U>
+        template<typename... U>
         void Insert(ExprResultValueType<U>... values) {
-            static_assert(IsTypeGroupSubset<TypeGroup<U...>, columns>(),
-                          "Insert values must be subset of table columns");
+            // static_assert(IsTypeGroupSubset<TypeGroup<U...>, columns>(),
+            //               "Insert values must be subset of table columns");
             std::string sql = std::string("INSERT INTO ") + std::string(name) + " (";
             sql += GetColumnNamesWithOutTableName<U...>();
             sql += ") VALUES (";
@@ -258,10 +337,11 @@ namespace TypeSQLite {
         }
 
         // 批量插入支援
-        template<TableColumnConcept... U>
+        template<typename... U>
+
         void InsertMany(const std::vector<std::tuple<ExprResultValueType<U>...> > &rows) {
-            static_assert(IsTypeGroupSubset<TypeGroup<U...>, columns>(),
-                          "Insert values must be subset of table columns");
+            // static_assert(IsTypeGroupSubset<TypeGroup<U...>, columns>(),
+            //               "Insert values must be subset of table columns");
 
             if (rows.empty()) {
                 return;
@@ -291,16 +371,20 @@ namespace TypeSQLite {
             // Transaction 解構子會自動 Commit（如果沒有異常）或 Rollback（如果有異常）
         }
 
-    public:
-        template<TableColumnConcept... U>
+        template<ColumnOrTableColumnConcept... U>
         auto Update(ExprResultValueType<U>... values) {
-            static_assert(IsTypeGroupSubset<TypeGroup<U...>, columns>(),
-                          "Update values must be subset of table columns");
-            return UpdateStatement<nullptr_t,U...>(nullptr, *this, values...);
+            // static_assert(IsTypeGroupSubset<TypeGroup<U...>, columns>(),
+            //               "Update values must be subset of table columns");
+            return UpdateStatement<nullptr_t, U...>(nullptr, *this, values...);
         }
 
         auto Delete() {
             return DeleteStatement<nullptr_t>(nullptr, *this);
+        }
+
+        template<typename Column>
+        auto operator[](Column column) {
+            return TableColumn<Column>();
         }
     };
 
@@ -308,8 +392,8 @@ namespace TypeSQLite {
     struct IsTable : std::false_type {
     };
 
-    template<FixedString TableName, ColumnOrTableConstraintOrOptionConcept... Items>
-    struct IsTable<Table<TableName, Items...> > : std::true_type {
+    template<TableDefinitionConcept TableDef>
+    struct IsTable<Table<TableDef> > : std::true_type {
     };
 
     template<typename T>

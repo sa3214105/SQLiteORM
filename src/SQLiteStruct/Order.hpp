@@ -15,4 +15,15 @@ namespace TypeSQLite {
             return FixedString(" DESC");
         }
     }
+
+    std::string OrderTypeToString(OrderType order) {
+        switch (order) {
+            case OrderType::ASC:
+                return " ASC";
+            case OrderType::DESC:
+                return " DESC";
+            default:
+                throw std::invalid_argument("Invalid OrderType");
+        }
+    }
 }
