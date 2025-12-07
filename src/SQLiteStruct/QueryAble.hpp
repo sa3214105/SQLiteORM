@@ -4,7 +4,6 @@
 #include "../SQLiteWrapper.hpp"
 #include "DataSource.h"
 #include "Column.hpp"
-#include "Condition.hpp"
 #include "Expr.hpp"
 #include "AggregateFunctions.hpp"
 

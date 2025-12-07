@@ -1,7 +1,6 @@
 #pragma once
 #include "SQLiteStruct/Column.hpp"
 #include "SQLiteStruct/Order.hpp"
-#include "SQLiteStruct/Condition.hpp"
 #include "SQLiteStruct/ConflictCause.hpp"
 #include "SQLiteStruct/ColumnConstraints.hpp"
 #include "SQLiteStruct/QueryAble.hpp"
