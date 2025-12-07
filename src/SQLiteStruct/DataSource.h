@@ -92,7 +92,7 @@ namespace TypeSQLite {
 
     // 提取 SourceInfo 中所有 JOIN 條件的參數
     template<typename MainSrc, typename... Joins>
-    auto ExtractSourceParams(const SourceInfo<MainSrc, Joins...> &src) {
+    auto GetExtractSourceParams(const SourceInfo<MainSrc, Joins...> &src) {
         return std::apply([](const auto &... join) {
             return std::tuple_cat(join.condition.params...);
         }, src.joins);
@@ -100,7 +100,7 @@ namespace TypeSQLite {
 
     // 特化：沒有 JOIN 時返回空 tuple
     template<typename MainSrc>
-    auto ExtractSourceParams(const SourceInfo<MainSrc> &src) {
+    auto GetExtractSourceParams(const SourceInfo<MainSrc> &src) {
         return std::tuple<>();
     }
 }

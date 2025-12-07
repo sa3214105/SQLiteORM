@@ -214,13 +214,9 @@ protected:
 };
 
 TEST_F(IndexTest_OrderBy, SortByIndexedColumn) {
-    //TODO : Enable OrderBy test when implemented
     auto results = table.Select(table[NameColumn], table[AgeColumn], table[ScoreColumn])
-                       // .OrderBy(table[ScoreColumn].Desc())
+                       .OrderBy(table[ScoreColumn], OrderType::DESC)
                        .Results();
-    std::sort(results.begin(), results.end(), [](const auto &a, const auto &b) {
-        return std::get<2>(a) > std::get<2>(b);
-    });
 
     ASSERT_EQ(results.size(), 4);
     auto &[name1, age1, score1] = results[0];

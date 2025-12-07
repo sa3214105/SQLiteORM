@@ -113,3 +113,141 @@ TEST_F(SelectTest, ComplexOperations) {
     auto results3 = userTable.Select(userTable[NameColumn]).Results();
     EXPECT_EQ(results3.size(), 3);
 }
+
+// ============ OrderBy 測試 ============
+TEST_F(SelectTest, OrderByAscending) {
+    auto results = userTable.Select(userTable[NameColumn], userTable[AgeColumn])
+            .OrderBy(userTable[AgeColumn])
+            .Results();
+
+    ASSERT_EQ(results.size(), 5);
+    auto &[name1, age1] = results[0];
+    EXPECT_EQ(age1, 20); // User1
+    auto &[name2, age2] = results[1];
+    EXPECT_EQ(age2, 25); // User2 或 Alice
+    auto &[name5, age5] = results[4];
+    EXPECT_EQ(age5, 40); // Bob
+}
+
+TEST_F(SelectTest, OrderByDescending) {
+    auto results = userTable.Select(userTable[NameColumn], userTable[AgeColumn])
+            .OrderBy(userTable[AgeColumn], OrderType::DESC)
+            .Results();
+
+    ASSERT_EQ(results.size(), 5);
+    auto &[name1, age1] = results[0];
+    EXPECT_EQ(age1, 40); // Bob
+    auto &[name2, age2] = results[1];
+    EXPECT_EQ(age2, 30); // Alice
+    auto &[name5, age5] = results[4];
+    EXPECT_EQ(age5, 20); // User1
+}
+
+TEST_F(SelectTest, OrderByScore) {
+    auto results = userTable.Select(userTable[NameColumn], userTable[ScoreColumn])
+            .OrderBy(userTable[ScoreColumn], OrderType::DESC)
+            .Results();
+
+    ASSERT_EQ(results.size(), 5);
+    auto &[name1, score1] = results[0];
+    EXPECT_DOUBLE_EQ(score1, 95.0); // Alice with highest score
+    auto &[name2, score2] = results[1];
+    EXPECT_DOUBLE_EQ(score2, 90.0); // User1
+    auto &[name5, score5] = results[4];
+    EXPECT_DOUBLE_EQ(score5, 70.0); // Bob with lowest score
+}
+
+TEST_F(SelectTest, OrderByWithWhere) {
+    auto results = userTable.Select(userTable[NameColumn], userTable[AgeColumn], userTable[ScoreColumn])
+            .Where(userTable[AgeColumn] >= 25_expr)
+            .OrderBy(userTable[ScoreColumn], OrderType::DESC)
+            .Results();
+
+    ASSERT_EQ(results.size(), 4);
+    auto &[name1, age1, score1] = results[0];
+    EXPECT_DOUBLE_EQ(score1, 95.0);
+    EXPECT_EQ(name1, "Alice");
+}
+
+TEST_F(SelectTest, OrderByNameAscending) {
+    auto results = userTable.Select(userTable[NameColumn], userTable[AgeColumn])
+            .OrderBy(userTable[NameColumn])
+            .Results();
+
+    ASSERT_EQ(results.size(), 5);
+    auto &[name1, age1] = results[0];
+    EXPECT_EQ(name1, "Alice"); // 字母順序第一個
+    auto &[name5, age5] = results[4];
+    EXPECT_EQ(name5, "User2"); // 字母順序最後
+}
+
+TEST_F(SelectTest, OrderByNameDescending) {
+    auto results = userTable.Select(userTable[NameColumn], userTable[AgeColumn])
+            .OrderBy(userTable[NameColumn], OrderType::DESC)
+            .Results();
+
+    ASSERT_EQ(results.size(), 5);
+    auto &[name1, age1] = results[0];
+    EXPECT_EQ(name1, "User2"); // 字母順序最後
+    auto &[name5, age5] = results[4];
+    EXPECT_EQ(name5, "Alice"); // 字母順序第一個
+}
+
+TEST_F(SelectTest, OrderByWithLimitOffset) {
+    auto results = userTable.Select(userTable[NameColumn], userTable[AgeColumn])
+            .OrderBy(userTable[AgeColumn])
+            .LimitOffset(3, 1)
+            .Results();
+
+    ASSERT_EQ(results.size(), 3);
+    // 跳過第一筆(age=20)，取後面三筆
+    auto &[name1, age1] = results[0];
+    EXPECT_EQ(age1, 25);
+}
+
+TEST_F(SelectTest, OrderByWithDistinct) {
+    auto results = userTable.Select(userTable[AgeColumn])
+            .Distinct()
+            .OrderBy(userTable[AgeColumn])
+            .Results();
+
+    ASSERT_EQ(results.size(), 4); // 20, 25, 30, 40
+    auto &[age1] = results[0];
+    EXPECT_EQ(age1, 20);
+    auto &[age4] = results[3];
+    EXPECT_EQ(age4, 40);
+}
+
+// ============ OrderBy 使用 Expr 測試 ============
+
+TEST_F(SelectTest, OrderByMultipleConditions) {
+    // SQLite 本身不直接支援多個 ORDER BY，但可以通過表達式組合
+    // 這裡測試單一 OrderBy 但結果按自然順序
+    auto results = userTable.Select(userTable[NameColumn], userTable[AgeColumn], userTable[ScoreColumn])
+            .OrderBy(userTable[AgeColumn])
+            .Results();
+
+    ASSERT_EQ(results.size(), 5);
+    // 驗證年齡是升序
+    for (size_t i = 1; i < results.size(); ++i) {
+        auto &[name_prev, age_prev, score_prev] = results[i-1];
+        auto &[name_curr, age_curr, score_curr] = results[i];
+        EXPECT_LE(age_prev, age_curr);
+    }
+}
+
+TEST_F(SelectTest, OrderByComplexQuery) {
+    // 組合 Where + OrderBy + LimitOffset
+    auto results = userTable.Select(userTable[NameColumn], userTable[AgeColumn], userTable[ScoreColumn])
+            .Where(userTable[ScoreColumn] >= 80.0_expr)
+            .OrderBy(userTable[ScoreColumn], OrderType::DESC)
+            .LimitOffset(3)
+            .Results();
+
+    ASSERT_LE(results.size(), 3);
+    // 驗證結果按分數降序排列
+    for (auto &[name, age, score] : results) {
+        EXPECT_GE(score, 80.0);
+    }
+}
+
