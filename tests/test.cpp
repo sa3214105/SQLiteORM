@@ -12,6 +12,7 @@
 #include "DistinctTest.hpp"
 #include "AggregateFunctionsTest.hpp"
 #include "ExprTest.hpp"
+#include "IndexTest.hpp"
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
