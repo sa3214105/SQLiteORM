@@ -2,68 +2,6 @@
 #include "TableConstraint.hpp"
 
 namespace TypeSQLite {
-    // Helper to filter only columns from a parameter pack
-    template<typename... Items>
-    struct FilterColumns;
-
-    template<>
-    struct FilterColumns<> {
-        using type = TypeGroup<>;
-    };
-
-    template<typename T, typename... Rest>
-    struct FilterColumns<T, Rest...> {
-        using type = std::conditional_t<
-            ColumnConcept<T>,
-            typename ConcatTypeGroup<TypeGroup<T>, typename FilterColumns<Rest...>::type>::type,
-            typename FilterColumns<Rest...>::type
-        >;
-    };
-
-    // Helper to filter only table constraints from a parameter pack
-    // template<typename... Items>
-    // struct FilterTableConstraints;
-    //
-    // template<>
-    // struct FilterTableConstraints<> {
-    //     using type = TypeGroup<>;
-    // };
-    //
-    // template<typename T, typename... Rest>
-    // struct FilterTableConstraints<T, Rest...> {
-    //     using type = std::conditional_t<
-    //         TableConstraintConcept<T>,
-    //         typename ConcatTypeGroup<TypeGroup<T>, typename FilterTableConstraints<Rest...>::type>::type,
-    //         typename FilterTableConstraints<Rest...>::type
-    //     >;
-    // };
-    //
-    // // Helper to filter only table options from a parameter pack
-    // template<typename... Items>
-    // struct FilterTableOptions;
-    //
-    // template<>
-    // struct FilterTableOptions<> {
-    //     using type = TypeGroup<>;
-    // };
-    //
-    // template<typename T, typename... Rest>
-    // struct FilterTableOptions<T, Rest...> {
-    //     using type = std::conditional_t<
-    //         TableOptionConcept<T>,
-    //         typename ConcatTypeGroup<TypeGroup<T>, typename FilterTableOptions<Rest...>::type>::type,
-    //         typename FilterTableOptions<Rest...>::type
-    //     >;
-    // };
-
-    // Helper to extract column types from TypeGroup as parameter pack
-    template<typename TG>
-    struct TypeGroupToPackHelper;
-
-    template<typename... Ts>
-    struct TypeGroupToPackHelper<TypeGroup<Ts...> > {
-        using type = TypeGroup<Ts...>;
-    };
 
     template<ColumnOrTableColumnConcept T, ColumnOrTableColumnConcept... Ts>
     std::string GetUpdateField() {
@@ -71,21 +9,6 @@ namespace TypeSQLite {
             return std::string(std::string(T::name) + " = ?");
         } else {
             return std::string(std::string(T::name) + " = ?, " + GetUpdateField<Ts...>());
-        }
-    }
-
-    // Helper to generate table constraint SQL from TypeGroup
-    template<typename ConstraintsTG>
-    std::string GetTableConstraintSQL() {
-        if constexpr (std::is_same_v<ConstraintsTG, TypeGroup<> >) {
-            return "";
-        } else {
-            using CurrentConstraint = typename ConstraintsTG::type;
-            std::string result = ", " + std::string(CurrentConstraint::value);
-            if constexpr (!std::is_same_v<typename ConstraintsTG::next, TypeGroup<> >) {
-                result += GetTableConstraintSQL<typename ConstraintsTG::next>();
-            }
-            return result;
         }
     }
 
@@ -98,42 +21,12 @@ namespace TypeSQLite {
         }
     }
 
-    // Helper to generate table options SQL from TypeGroup (applied after closing parenthesis)
-    template<typename OptionsTG>
-    std::string GetTableOptionsSQL() {
-        if constexpr (std::is_same_v<OptionsTG, TypeGroup<> >) {
-            return "";
-        } else {
-            using CurrentOption = typename OptionsTG::type;
-            std::string result = std::string(CurrentOption::value);
-            if constexpr (!std::is_same_v<typename OptionsTG::next, TypeGroup<> >) {
-                result += "," + GetTableOptionsSQL<typename OptionsTG::next>();
-            }
-            return result;
-        }
-    }
-
     template<typename T, typename... Ts>
     std::string GetTableOptionsSQLFromPack() {
         if constexpr (sizeof...(Ts) == 0) {
             return std::string(T::value);
         } else {
             return std::string(T::value) + "," + GetTableOptionsSQLFromPack<Ts...>();
-        }
-    }
-
-    // Helper to generate column definitions from TypeGroup of columns
-    template<typename ColumnsTG>
-    std::string GetColumnDefinitionsFromTypeGroup() {
-        if constexpr (std::is_same_v<ColumnsTG, TypeGroup<> >) {
-            return "";
-        } else {
-            using CurrentColumn = typename ColumnsTG::type;
-            std::string result = GetColumnDefinition<CurrentColumn>();
-            if constexpr (!std::is_same_v<typename ColumnsTG::next, TypeGroup<> >) {
-                result += "," + GetColumnDefinitionsFromTypeGroup<typename ColumnsTG::next>();
-            }
-            return result;
         }
     }
 
@@ -178,15 +71,6 @@ namespace TypeSQLite {
 
     template<typename T>
     concept TableDefinitionConcept = IsTableDefinition<T>::value;
-
-    // Helper to generate TableColumn TypeGroup from filtered columns
-    template<typename TableType, typename ColumnsTG>
-    struct GenerateTableColumns;
-
-    template<typename TableType, typename... Columns>
-    struct GenerateTableColumns<TableType, TypeGroup<Columns...> > {
-        using type = TypeGroup<TableColumn_Base<TableType, Columns>...>;
-    };
 
     template<typename TableDef>
     class Table final : public QueryAble<decltype(std::declval<TableDef>().columns), SourceInfo<Table<TableDef> > > {
