@@ -23,7 +23,7 @@ TEST_F(DeleteTest, DeleteSingleRow) {
     userTable.Delete()
             .Where(userTable[NameColumn] == "Alice"_expr).Execute();
 
-    auto results = userTable.Select(userTable[NameColumn]).Results();
+    auto results = userTable.Select(userTable[NameColumn]).Results().ToVector();
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<0>(results[0]), "Bob");
 }
@@ -35,7 +35,7 @@ TEST_F(DeleteTest, DeleteMultipleRows) {
 
     userTable.Delete().Where(userTable[AgeColumn] == 20_expr).Execute();
 
-    auto results = userTable.Select(userTable[AgeColumn]).Results();
+    auto results = userTable.Select(userTable[AgeColumn]).Results().ToVector();
     EXPECT_EQ(results.size(), 1);
 }
 
@@ -45,6 +45,6 @@ TEST_F(DeleteTest, DeleteAllRows) {
 
     userTable.Delete().Execute();
 
-    auto results = userTable.Select(userTable[NameColumn]).Results();
+    auto results = userTable.Select(userTable[NameColumn]).Results().ToVector();
     EXPECT_EQ(results.size(), 0);
 }

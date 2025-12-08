@@ -33,7 +33,7 @@ TEST_F(BatchInsertTest, InsertManyBasic) {
         testTable[IdColumn{}],
         testTable[NameColumn],
         testTable[AgeColumn]
-    ).Results();
+    ).Results().ToVector();
 
     EXPECT_EQ(results.size(), 100);
     EXPECT_EQ(std::get<0>(results[0]), 1);
@@ -59,7 +59,7 @@ TEST_F(BatchInsertTest, InsertManyEmpty) {
     auto results = testTable.Select(
         testTable[IdColumn{}],
         testTable[NameColumn]
-    ).Results();
+    ).Results().ToVector();
 
     EXPECT_EQ(results.size(), 0);
 }
@@ -84,7 +84,7 @@ TEST_F(BatchInsertTest, InsertManyPartialColumns) {
     auto results = testTable.Select(
         testTable[IdColumn{}],
         testTable[NameColumn]
-    ).Results();
+    ).Results().ToVector();
 
     EXPECT_EQ(results.size(), 10);
     EXPECT_EQ(std::get<1>(results[5]), "User6");
@@ -118,7 +118,7 @@ TEST_F(BatchInsertTest, InsertManyWithConstraintViolation) {
         testTable[IdColumn{}],
         testTable[NameColumn],
         testTable[EmailColumn{}]
-    ).Results();
+    ).Results().ToVector();
 
     EXPECT_EQ(results.size(), 0);
 }
@@ -149,7 +149,7 @@ TEST_F(BatchInsertTest, InsertManyMixedWithSingleInsert) {
     auto results = testTable.Select(
         testTable[IdColumn{}],
         testTable[NameColumn]
-    ).Results();
+    ).Results().ToVector();
 
     EXPECT_EQ(results.size(), 12);
     EXPECT_EQ(std::get<1>(results[0]), "Single");
@@ -190,7 +190,7 @@ TEST_F(BatchInsertTest, InsertManyPerformance) {
     std::cout << "InsertMany 1000 rows took: " << duration.count() << "ms" << std::endl;
 
     // 驗證結果
-    auto results = testTable.Select(testTable[IdColumn{}]).Results();
+    auto results = testTable.Select(testTable[IdColumn{}]).Results().ToVector();
 
     EXPECT_EQ(results.size(), 1000);
 }

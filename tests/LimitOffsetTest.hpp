@@ -51,7 +51,7 @@ TEST_F(LimitOffsetTest, LimitOnly) {
     auto results = userTable
             .Select(userTable[NameColumn], userTable[AgeColumn])
             .LimitOffset(5)
-            .Results();
+            .Results().ToVector();
 
     EXPECT_EQ(results.size(), 5);
 }
@@ -62,7 +62,7 @@ TEST_F(LimitOffsetTest, LimitWithOffset) {
     auto results = userTable
             .Select(userTable[NameColumn], userTable[AgeColumn])
             .LimitOffset(3, 2)
-            .Results();
+            .Results().ToVector();
 
     EXPECT_EQ(results.size(), 3);
     EXPECT_EQ(std::get<0>(results[0]), "User2");
@@ -76,7 +76,7 @@ TEST_F(LimitOffsetTest, LimitOffsetWithWhere) {
             .Select(userTable[NameColumn], userTable[AgeColumn])
             .Where(userTable[AgeColumn] >= 23_expr)
             .LimitOffset(3, 1)
-            .Results();
+            .Results().ToVector();
 
     EXPECT_EQ(results.size(), 3);
     EXPECT_EQ(std::get<1>(results[0]), 24);
@@ -88,7 +88,7 @@ TEST_F(LimitOffsetSmallTest, OffsetExceedsTotalRows) {
     auto results = userTable
             .Select(userTable[NameColumn], userTable[AgeColumn])
             .LimitOffset(5, 10)
-            .Results();
+            .Results().ToVector();
 
     EXPECT_EQ(results.size(), 0);
 }
@@ -99,7 +99,7 @@ TEST_F(LimitOffsetSmallTest, LimitExceedsTotalRows) {
     auto results = userTable
             .Select(userTable[NameColumn], userTable[AgeColumn])
             .LimitOffset(100)
-            .Results();
+            .Results().ToVector();
 
     EXPECT_EQ(results.size(), 5);
 }
@@ -113,7 +113,7 @@ TEST_F(LimitOffsetTest, Pagination) {
     auto page1 = userTable
             .Select(userTable[NameColumn])
             .LimitOffset(pageSize, 0)
-            .Results();
+            .Results().ToVector();
     EXPECT_EQ(page1.size(), 3);
     EXPECT_EQ(std::get<0>(page1[0]), "User0");
 
@@ -121,7 +121,7 @@ TEST_F(LimitOffsetTest, Pagination) {
     auto page2 = userTable
             .Select(userTable[NameColumn])
             .LimitOffset(pageSize, 3)
-            .Results();
+            .Results().ToVector();
     EXPECT_EQ(page2.size(), 3);
     EXPECT_EQ(std::get<0>(page2[0]), "User3");
 
@@ -129,7 +129,7 @@ TEST_F(LimitOffsetTest, Pagination) {
     auto page3 = userTable
             .Select(userTable[NameColumn])
             .LimitOffset(pageSize, 6)
-            .Results();
+            .Results().ToVector();
     EXPECT_EQ(page3.size(), 3);
     EXPECT_EQ(std::get<0>(page3[0]), "User6");
 
@@ -137,7 +137,7 @@ TEST_F(LimitOffsetTest, Pagination) {
     auto page4 = userTable
             .Select(userTable[NameColumn])
             .LimitOffset(pageSize, 9)
-            .Results();
+            .Results().ToVector();
     EXPECT_EQ(page4.size(), 1);
     EXPECT_EQ(std::get<0>(page4[0]), "User9");
 }
@@ -148,7 +148,7 @@ TEST_F(LimitOffsetSmallTest, ZeroLimit) {
     auto results = userTable
             .Select(userTable[NameColumn], userTable[AgeColumn])
             .LimitOffset(0)
-            .Results();
+            .Results().ToVector();
 
     EXPECT_EQ(results.size(), 0);
 }
@@ -160,7 +160,7 @@ TEST_F(LimitOffsetTest, LimitOffsetChainedAfterWhere) {
             .Select(userTable[NameColumn], userTable[AgeColumn])
             .Where(userTable[AgeColumn] < 28_expr)
             .LimitOffset(2, 1)
-            .Results();
+            .Results().ToVector();
 
     EXPECT_EQ(results.size(), 2);
     EXPECT_EQ(std::get<1>(results[0]), 21);

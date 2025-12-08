@@ -27,7 +27,7 @@ TEST_F(ColumnConstraintsTest, ConstraintPrimaryKey) {
     );
 
     // 驗證只有一筆資料
-    auto results = testTable.Select(testTable[IdColumn{}]).Results();
+    auto results = testTable.Select(testTable[IdColumn{}]).Results().ToVector();
     EXPECT_EQ(results.size(), 1);
 }
 
@@ -41,7 +41,7 @@ TEST_F(ColumnConstraintsTest, ConstraintPrimaryKeyDesc) {
     testTable.Insert<IdColumn, decltype(NameColumn)>(1, "First");
     testTable.Insert<IdColumn, decltype(NameColumn)>(2, "Second");
 
-    auto results = testTable.Select(testTable[IdColumn{}]).Results();
+    auto results = testTable.Select(testTable[IdColumn{}]).Results().ToVector();
     EXPECT_EQ(results.size(), 2);
 }
 
@@ -55,7 +55,7 @@ TEST_F(ColumnConstraintsTest, ConstraintNotNull) {
     // 插入有效資料
     testTable.Insert<decltype(NameColumn), EmailColumn>("Alice", "alice@example.com");
 
-    auto results = testTable.Select(testTable[EmailColumn{}]).Results();
+    auto results = testTable.Select(testTable[EmailColumn{}]).Results().ToVector();
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<0>(results[0]), "alice@example.com");
 }
@@ -79,7 +79,7 @@ TEST_F(ColumnConstraintsTest, ConstraintUnique) {
     // 插入不同的值應該成功
     testTable.Insert<UsernameColumn, decltype(AgeColumn)>("bob456", 30);
 
-    auto results = testTable.Select(testTable[UsernameColumn{}]).Results();
+    auto results = testTable.Select(testTable[UsernameColumn{}]).Results().ToVector();
     EXPECT_EQ(results.size(), 2);
 }
 
@@ -93,7 +93,7 @@ TEST_F(ColumnConstraintsTest, ConstraintDefaultInteger) {
     // 只插入 name，status 應該使用預設值
     testTable.Insert<decltype(NameColumn)>("Alice");
 
-    auto results = testTable.Select(testTable[NameColumn], testTable[StatusColumn{}]).Results();
+    auto results = testTable.Select(testTable[NameColumn], testTable[StatusColumn{}]).Results().ToVector();
 
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<0>(results[0]), "Alice");
@@ -110,7 +110,7 @@ TEST_F(ColumnConstraintsTest, ConstraintDefaultString) {
     // 只插入 name
     testTable.Insert<decltype(NameColumn)>("Alice");
 
-    auto results = testTable.Select(testTable[NameColumn], testTable[CountryColumn{}]).Results();
+    auto results = testTable.Select(testTable[NameColumn], testTable[CountryColumn{}]).Results().ToVector();
 
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<0>(results[0]), "Alice");
@@ -132,7 +132,7 @@ TEST_F(ColumnConstraintsTest, ConstraintCombinationPrimaryKeyNotNull) {
         std::runtime_error
     );
 
-    auto results = testTable.Select(testTable[IdColumn{}]).Results();
+    auto results = testTable.Select(testTable[IdColumn{}]).Results().ToVector();
     EXPECT_EQ(results.size(), 1);
 }
 
@@ -154,7 +154,7 @@ TEST_F(ColumnConstraintsTest, ConstraintCombinationUniqueNotNull) {
     // 插入不同的 email 應該成功
     testTable.Insert<decltype(NameColumn), EmailColumn>("Bob", "bob@test.com");
 
-    auto results = testTable.Select(testTable[EmailColumn{}]).Results();
+    auto results = testTable.Select(testTable[EmailColumn{}]).Results().ToVector();
     EXPECT_EQ(results.size(), 2);
 }
 
@@ -170,7 +170,7 @@ TEST_F(ColumnConstraintsTest, ConstraintPrimaryKeyConflictReplace) {
     // 插入重複 ID，應該替換舊資料
     testTable.Insert<IdColumn, decltype(NameColumn)>(1, "Bob");
 
-    auto results = testTable.Select(testTable[IdColumn{}], testTable[NameColumn]).Results();
+    auto results = testTable.Select(testTable[IdColumn{}], testTable[NameColumn]).Results().ToVector();
 
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<1>(results[0]), "Bob");
@@ -188,7 +188,7 @@ TEST_F(ColumnConstraintsTest, ConstraintUniqueConflictIgnore) {
     // 插入重複值，應該被忽略（不拋出異常）
     testTable.Insert<decltype(NameColumn), EmailColumn>("Bob", "same@test.com");
 
-    auto results = testTable.Select(testTable[NameColumn]).Results();
+    auto results = testTable.Select(testTable[NameColumn]).Results().ToVector();
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<0>(results[0]), "Alice");
 }
@@ -203,7 +203,7 @@ TEST_F(ColumnConstraintsTest, ConstraintNotNullConflictFail) {
     // 插入有效資料
     testTable.Insert<decltype(NameColumn), RequiredColumn>("Alice", "value");
 
-    auto results = testTable.Select(testTable[RequiredColumn{}]).Results();
+    auto results = testTable.Select(testTable[RequiredColumn{}]).Results().ToVector();
     EXPECT_EQ(results.size(), 1);
 }
 
@@ -236,7 +236,7 @@ TEST_F(ColumnConstraintsTest, ConstraintComplexCombination) {
         testTable[NameColumn],
         testTable[EmailColumn{}],
         testTable[StatusColumn{}]
-    ).Results();
+    ).Results().ToVector();
 
     EXPECT_EQ(results.size(), 2);
 
@@ -258,7 +258,7 @@ TEST_F(ColumnConstraintsTest, ConstraintDefaultReal) {
 
     testTable.Insert<decltype(NameColumn)>("Product1");
 
-    auto results = testTable.Select(testTable[NameColumn], testTable[RatingColumn{}]).Results();
+    auto results = testTable.Select(testTable[NameColumn], testTable[RatingColumn{}]).Results().ToVector();
 
     EXPECT_EQ(results.size(), 1);
     EXPECT_DOUBLE_EQ(std::get<1>(results[0]), 5.0);

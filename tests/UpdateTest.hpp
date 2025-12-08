@@ -23,7 +23,7 @@ TEST_F(UpdateTest, UpdateSingleColumn) {
             .Where(userTable[NameColumn] == "OldName"_expr).Execute();
 
     auto results = userTable.Select(userTable[NameColumn]).Results();
-    EXPECT_EQ(std::get<0>(results[0]), "NewName");
+    EXPECT_EQ(std::get<0>(*results.begin()), "NewName");
 }
 
 TEST_F(UpdateTest, UpdateMultipleColumns) {
@@ -33,8 +33,9 @@ TEST_F(UpdateTest, UpdateMultipleColumns) {
             .Where(userTable[NameColumn] == "Alice"_expr).Execute();
 
     auto results = userTable.Select(userTable[NameColumn], userTable[AgeColumn]).Results();
-    EXPECT_EQ(std::get<0>(results[0]), "Bob");
-    EXPECT_EQ(std::get<1>(results[0]), 30);
+    auto [name,age] = *results.begin();
+    EXPECT_EQ(name, "Bob");
+    EXPECT_EQ(age, 30);
 }
 
 TEST_F(UpdateTest, UpdateMultipleRows) {
@@ -44,7 +45,7 @@ TEST_F(UpdateTest, UpdateMultipleRows) {
     userTable.Update<decltype(AgeColumn)>(30)
             .Where(userTable[AgeColumn] == 25_expr).Execute();
 
-    auto results = userTable.Select(userTable[AgeColumn]).Results();
+    auto results = userTable.Select(userTable[AgeColumn]).Results().ToVector();
     EXPECT_EQ(results.size(), 2);
     EXPECT_EQ(std::get<0>(results[0]), 30);
     EXPECT_EQ(std::get<0>(results[1]), 30);

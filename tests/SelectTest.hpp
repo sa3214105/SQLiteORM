@@ -21,21 +21,21 @@ protected:
 
 // ============ Select 測試 ============
 TEST_F(SelectTest, SelectAllRows) {
-    auto results = userTable.Select(userTable[NameColumn], userTable[AgeColumn]).Results();
+    auto results = userTable.Select(userTable[NameColumn], userTable[AgeColumn]).Results().ToVector();
     EXPECT_EQ(results.size(), 5);
 }
 
 // ============ Where 條件測試 ============
 TEST_F(SelectTest, WhereEqual) {
     auto results = userTable.Select(userTable[NameColumn]).Where(userTable[NameColumn] == "Alice"_expr).Results();
-    for (auto &[name]: results) {
+    for (auto [name]: results) {
         ASSERT_EQ(name, "Alice");
     }
 }
 
 TEST_F(SelectTest, WhereNotEqual) {
     auto results = userTable.Select(userTable[NameColumn]).Where(userTable[NameColumn] != "Alice"_expr).Results();
-    for (auto &[name]: results) {
+    for (auto [name]: results) {
         ASSERT_NE(name, "Alice");
     }
 }
@@ -43,7 +43,7 @@ TEST_F(SelectTest, WhereNotEqual) {
 TEST_F(SelectTest, WhereGreaterThan) {
     auto results = userTable.Select(userTable[AgeColumn])
             .Where(userTable[AgeColumn] > 25_expr).Results();
-    for (auto &[age]: results) {
+    for (auto [age]: results) {
         ASSERT_GT(age, 25);
     }
 }
@@ -51,7 +51,7 @@ TEST_F(SelectTest, WhereGreaterThan) {
 TEST_F(SelectTest, WhereLessThan) {
     auto results = userTable.Select(userTable[AgeColumn])
             .Where(userTable[AgeColumn] < 25_expr).Results();
-    for (auto &[age]: results) {
+    for (auto [age]: results) {
         ASSERT_LT(age, 25);
     }
 }
@@ -59,7 +59,7 @@ TEST_F(SelectTest, WhereLessThan) {
 TEST_F(SelectTest, WhereGreaterThanEqual) {
     auto results = userTable.Select(userTable[AgeColumn])
             .Where(userTable[AgeColumn] >= 25_expr).Results();
-    for (auto &[age]: results) {
+    for (auto [age]: results) {
         ASSERT_GE(age, 25);
     }
 }
@@ -67,7 +67,7 @@ TEST_F(SelectTest, WhereGreaterThanEqual) {
 TEST_F(SelectTest, WhereLessThanEqual) {
     auto results = userTable.Select(userTable[AgeColumn])
             .Where(userTable[AgeColumn] <= 25_expr).Results();
-    for (auto &[age]: results) {
+    for (auto [age]: results) {
         ASSERT_LE(age, 25);
     }
 }
@@ -76,7 +76,7 @@ TEST_F(SelectTest, WhereLessThanEqual) {
 TEST_F(SelectTest, WhereAND) {
     auto results = userTable.Select(userTable[AgeColumn], userTable[NameColumn])
             .Where((userTable[AgeColumn] >= 25_expr) && (userTable[NameColumn] == "Alice"_expr)).Results();
-    for (auto &[age, name]: results) {
+    for (auto [age, name]: results) {
         ASSERT_GE(age, 25);
         ASSERT_EQ(name, "Alice");
     }
@@ -85,7 +85,7 @@ TEST_F(SelectTest, WhereAND) {
 TEST_F(SelectTest, WhereOR) {
     auto results = userTable.Select(userTable[AgeColumn], userTable[NameColumn])
             .Where((userTable[AgeColumn] < 25_expr) || (userTable[NameColumn] == "Bob"_expr)).Results();
-    for (auto &[age, name]: results) {
+    for (auto [age, name]: results) {
         if (age >= 25) {
             ASSERT_EQ(name, "Bob");
         } else {
@@ -98,7 +98,7 @@ TEST_F(SelectTest, WhereOR) {
 TEST_F(SelectTest, ComplexOperations) {
     // 查詢年齡 > 25 的用戶
     auto results1 = userTable.Select(userTable[NameColumn], userTable[AgeColumn])
-            .Where(userTable[AgeColumn] > 25_expr).Results();
+            .Where(userTable[AgeColumn] > 25_expr).Results().ToVector();
     EXPECT_EQ(results1.size(), 2);
 
     // 更新 Bob 的分數
@@ -106,11 +106,12 @@ TEST_F(SelectTest, ComplexOperations) {
 
     // 查詢 Bob 的新分數
     auto results2 = userTable.Select(userTable[ScoreColumn]).Where(userTable[NameColumn] == "Bob"_expr).Results();
-    EXPECT_EQ(std::get<0>(results2[0]), 92.0);
+
+    EXPECT_EQ(std::get<0>(*results2.begin()), 92.0);
 
     // 刪除年齡 >= 30 的用戶
     userTable.Delete().Where(userTable[AgeColumn] >= 30_expr).Execute();
-    auto results3 = userTable.Select(userTable[NameColumn]).Results();
+    auto results3 = userTable.Select(userTable[NameColumn]).Results().ToVector();
     EXPECT_EQ(results3.size(), 3);
 }
 
@@ -118,7 +119,8 @@ TEST_F(SelectTest, ComplexOperations) {
 TEST_F(SelectTest, OrderByAscending) {
     auto results = userTable.Select(userTable[NameColumn], userTable[AgeColumn])
             .OrderBy(userTable[AgeColumn])
-            .Results();
+            .Results()
+            .ToVector();
 
     ASSERT_EQ(results.size(), 5);
     auto &[name1, age1] = results[0];
@@ -132,7 +134,7 @@ TEST_F(SelectTest, OrderByAscending) {
 TEST_F(SelectTest, OrderByDescending) {
     auto results = userTable.Select(userTable[NameColumn], userTable[AgeColumn])
             .OrderBy(userTable[AgeColumn], OrderType::DESC)
-            .Results();
+            .Results().ToVector();
 
     ASSERT_EQ(results.size(), 5);
     auto &[name1, age1] = results[0];
@@ -146,7 +148,8 @@ TEST_F(SelectTest, OrderByDescending) {
 TEST_F(SelectTest, OrderByScore) {
     auto results = userTable.Select(userTable[NameColumn], userTable[ScoreColumn])
             .OrderBy(userTable[ScoreColumn], OrderType::DESC)
-            .Results();
+            .Results()
+            .ToVector();
 
     ASSERT_EQ(results.size(), 5);
     auto &[name1, score1] = results[0];
@@ -161,7 +164,8 @@ TEST_F(SelectTest, OrderByWithWhere) {
     auto results = userTable.Select(userTable[NameColumn], userTable[AgeColumn], userTable[ScoreColumn])
             .Where(userTable[AgeColumn] >= 25_expr)
             .OrderBy(userTable[ScoreColumn], OrderType::DESC)
-            .Results();
+            .Results()
+            .ToVector();
 
     ASSERT_EQ(results.size(), 4);
     auto &[name1, age1, score1] = results[0];
@@ -172,7 +176,8 @@ TEST_F(SelectTest, OrderByWithWhere) {
 TEST_F(SelectTest, OrderByNameAscending) {
     auto results = userTable.Select(userTable[NameColumn], userTable[AgeColumn])
             .OrderBy(userTable[NameColumn])
-            .Results();
+            .Results()
+            .ToVector();
 
     ASSERT_EQ(results.size(), 5);
     auto &[name1, age1] = results[0];
@@ -184,7 +189,8 @@ TEST_F(SelectTest, OrderByNameAscending) {
 TEST_F(SelectTest, OrderByNameDescending) {
     auto results = userTable.Select(userTable[NameColumn], userTable[AgeColumn])
             .OrderBy(userTable[NameColumn], OrderType::DESC)
-            .Results();
+            .Results()
+            .ToVector();
 
     ASSERT_EQ(results.size(), 5);
     auto &[name1, age1] = results[0];
@@ -197,7 +203,8 @@ TEST_F(SelectTest, OrderByWithLimitOffset) {
     auto results = userTable.Select(userTable[NameColumn], userTable[AgeColumn])
             .OrderBy(userTable[AgeColumn])
             .LimitOffset(3, 1)
-            .Results();
+            .Results()
+            .ToVector();
 
     ASSERT_EQ(results.size(), 3);
     // 跳過第一筆(age=20)，取後面三筆
@@ -209,7 +216,8 @@ TEST_F(SelectTest, OrderByWithDistinct) {
     auto results = userTable.Select(userTable[AgeColumn])
             .Distinct()
             .OrderBy(userTable[AgeColumn])
-            .Results();
+            .Results()
+            .ToVector();
 
     ASSERT_EQ(results.size(), 4); // 20, 25, 30, 40
     auto &[age1] = results[0];
@@ -225,12 +233,13 @@ TEST_F(SelectTest, OrderByMultipleConditions) {
     // 這裡測試單一 OrderBy 但結果按自然順序
     auto results = userTable.Select(userTable[NameColumn], userTable[AgeColumn], userTable[ScoreColumn])
             .OrderBy(userTable[AgeColumn])
-            .Results();
+            .Results()
+            .ToVector();
 
     ASSERT_EQ(results.size(), 5);
     // 驗證年齡是升序
     for (size_t i = 1; i < results.size(); ++i) {
-        auto &[name_prev, age_prev, score_prev] = results[i-1];
+        auto &[name_prev, age_prev, score_prev] = results[i - 1];
         auto &[name_curr, age_curr, score_curr] = results[i];
         EXPECT_LE(age_prev, age_curr);
     }
@@ -242,12 +251,12 @@ TEST_F(SelectTest, OrderByComplexQuery) {
             .Where(userTable[ScoreColumn] >= 80.0_expr)
             .OrderBy(userTable[ScoreColumn], OrderType::DESC)
             .LimitOffset(3)
-            .Results();
+            .Results()
+            .ToVector();
 
     ASSERT_LE(results.size(), 3);
     // 驗證結果按分數降序排列
-    for (auto &[name, age, score] : results) {
+    for (auto &[name, age, score]: results) {
         EXPECT_GE(score, 80.0);
     }
 }
-

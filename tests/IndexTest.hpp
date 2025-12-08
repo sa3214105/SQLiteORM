@@ -22,7 +22,7 @@ protected:
 TEST_F(IndexTest_SingleColumn, QueryWithIndex) {
     auto results = table.Select(table[NameColumn], table[AgeColumn], table[ScoreColumn])
                        .Where(table[NameColumn] == "Bob"_expr)
-                       .Results();
+                       .Results().ToVector();
 
     ASSERT_EQ(results.size(), 1);
     auto &[name, age, score] = results[0];
@@ -54,7 +54,7 @@ protected:
 TEST_F(IndexTest_Composite, QueryCompositeIndex) {
     auto results = table.Select(table[NameColumn], table[AgeColumn], table[ScoreColumn])
                        .Where(table[NameColumn] == "Alice"_expr && table[AgeColumn] == 30_expr)
-                       .Results();
+                       .Results().ToVector();
 
     ASSERT_EQ(results.size(), 1);
     auto &[name, age, score] = results[0];
@@ -87,7 +87,7 @@ protected:
 TEST_F(IndexTest_NonUnique, QueryNonUniqueIndex) {
     auto results = table.Select(table[NameColumn], table[AgeColumn], table[ScoreColumn])
                        .Where(table[AgeColumn] == 25_expr)
-                       .Results();
+                       .Results().ToVector();
 
     ASSERT_EQ(results.size(), 3);
     for (const auto &[name, age, score] : results) {
@@ -121,7 +121,7 @@ protected:
 TEST_F(IndexTest_Multiple, QueryWithNameIndex) {
     auto results = table.Select(table[NameColumn], table[AgeColumn], table[ScoreColumn])
                        .Where(table[NameColumn] == "Bob"_expr)
-                       .Results();
+                       .Results().ToVector();
     ASSERT_EQ(results.size(), 1);
     auto &[name, age, score] = results[0];
     EXPECT_EQ(name, "Bob");
@@ -130,7 +130,7 @@ TEST_F(IndexTest_Multiple, QueryWithNameIndex) {
 TEST_F(IndexTest_Multiple, QueryWithAgeIndex) {
     auto results = table.Select(table[NameColumn], table[AgeColumn], table[ScoreColumn])
                        .Where(table[AgeColumn] == 25_expr)
-                       .Results();
+                       .Results().ToVector();
     ASSERT_EQ(results.size(), 2);
 }
 
@@ -157,7 +157,7 @@ TEST_F(IndexTest_UniqueConstraint, ViolateUniqueConstraint) {
     EXPECT_THROW((table.Insert<decltype(NameColumn), decltype(AgeColumn), decltype(ScoreColumn)>("Test1", 30, 90.0)), std::runtime_error);
 
     // 確認只有一筆資料
-    auto results = table.Select(table[NameColumn], table[AgeColumn], table[ScoreColumn]).Results();
+    auto results = table.Select(table[NameColumn], table[AgeColumn], table[ScoreColumn]).Results().ToVector();
     ASSERT_EQ(results.size(), 1);
 }
 
@@ -188,7 +188,7 @@ TEST_F(IndexTest_CompositeUnique, ViolateCompositeUnique) {
     }), std::runtime_error);
 
     // 確認資料數量
-    auto results = table.Select(table[NameColumn], table[AgeColumn], table[ScoreColumn]).Results();
+    auto results = table.Select(table[NameColumn], table[AgeColumn], table[ScoreColumn]).Results().ToVector();
     ASSERT_EQ(results.size(), 3);
 }
 
@@ -216,7 +216,7 @@ protected:
 TEST_F(IndexTest_OrderBy, SortByIndexedColumn) {
     auto results = table.Select(table[NameColumn], table[AgeColumn], table[ScoreColumn])
                        .OrderBy(table[ScoreColumn], OrderType::DESC)
-                       .Results();
+                       .Results().ToVector();
 
     ASSERT_EQ(results.size(), 4);
     auto &[name1, age1, score1] = results[0];
@@ -253,7 +253,7 @@ protected:
 TEST_F(IndexTest_RangeQuery, QueryRange) {
     auto results = table.Select(table[NameColumn], table[AgeColumn], table[ScoreColumn])
                        .Where(table[ScoreColumn] >= 25.0_expr && table[ScoreColumn] <= 75.0_expr)
-                       .Results();
+                       .Results().ToVector();
 
     ASSERT_EQ(results.size(), 3);
     auto &[name1, age1, score1] = results[0];

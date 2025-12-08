@@ -200,7 +200,6 @@ namespace TypeSQLite {
             sqlite.Execute(sql);
         }
 
-        //TODO 支援批量插入
         template<typename... U>
         void Insert(ExprResultValueType<U>... values) {
             // static_assert(IsTypeGroupSubset<TypeGroup<U...>, columns>(),
@@ -222,7 +221,6 @@ namespace TypeSQLite {
 
         // 批量插入支援
         template<typename... U>
-
         void InsertMany(const std::vector<std::tuple<ExprResultValueType<U>...> > &rows) {
             // static_assert(IsTypeGroupSubset<TypeGroup<U...>, columns>(),
             //               "Insert values must be subset of table columns");

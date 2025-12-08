@@ -5,7 +5,7 @@
 class BasicJoinTest : public ::testing::Test {
 protected:
     Database<decltype(UserTableDefinition), decltype(DeptTableDefinition)> db =
-        Database{"test_database.db", UserTableDefinition, DeptTableDefinition};
+            Database{"test_database.db", UserTableDefinition, DeptTableDefinition};
     Table<decltype(UserTableDefinition)> &userTable = db.GetTable<decltype(UserTableDefinition)>();
     Table<decltype(DeptTableDefinition)> &deptTable = db.GetTable<decltype(DeptTableDefinition)>();
 
@@ -33,7 +33,8 @@ TEST_F(BasicJoinTest, InnerJoinBasic) {
     // InnerJoin on NameColumn - 只返回交集 (Alice, David)
     auto results = userTable.InnerJoin(deptTable, userTable[NameColumn] == deptTable[NameColumn])
             .Select(userTable[NameColumn], userTable[AgeColumn], deptTable[DeptColumn])
-            .Results();
+            .Results()
+            .ToVector();
 
     // INNER JOIN 只有交集: Alice, David
     EXPECT_EQ(results.size(), 2);
@@ -60,7 +61,8 @@ TEST_F(BasicJoinTest, LeftJoinBasic) {
     // LeftJoin - 返回左表的所有行 (Alice, Bob, Charlie, David)
     auto results = userTable.LeftJoin(deptTable, userTable[NameColumn] == deptTable[NameColumn])
             .Select(userTable[NameColumn], userTable[AgeColumn], deptTable[DeptColumn])
-            .Results();
+            .Results()
+            .ToVector();
 
     // LEFT JOIN 應返回左表的所有行
     EXPECT_EQ(results.size(), 4);
@@ -87,7 +89,8 @@ TEST_F(BasicJoinTest, RightJoinBasic) {
     // RightJoin - 返回右表的所有行 (Alice, David, Eve)
     auto results = userTable.RightJoin(deptTable, userTable[NameColumn] == deptTable[NameColumn])
             .Select(userTable[NameColumn], userTable[AgeColumn], deptTable[DeptColumn])
-            .Results();
+            .Results()
+            .ToVector();
 
     // RIGHT JOIN 應返回右表的所有行 - 至少應該包含右表中的所有行
     EXPECT_GE(results.size(), 3);
@@ -105,7 +108,8 @@ TEST_F(BasicJoinTest, CrossJoinBasic) {
     // CrossJoin - 笛卡爾乘積 (2 x 2 = 4)
     auto results = userTable.CrossJoin(deptTable, 1_expr == 1_expr)
             .Select(userTable[NameColumn], userTable[AgeColumn], deptTable[DeptColumn])
-            .Results();
+            .Results()
+            .ToVector();
 
     // CROSS JOIN 應返回笛卡爾乘積的結果 (2 x 2 = 4)
     EXPECT_EQ(results.size(), 4);
@@ -125,7 +129,8 @@ TEST_F(BasicJoinTest, FullJoinBasic) {
     // FullJoin on NameColumn
     auto results = userTable.FullJoin(deptTable, userTable[NameColumn] == deptTable[NameColumn])
             .Select(userTable[NameColumn], userTable[AgeColumn], deptTable[DeptColumn])
-            .Results();
+            .Results()
+            .ToVector();
 
     // 應該有 4 筆: Alice(交集), Bob(左), Charlie(左), David(交集)
     std::vector<std::string> names;
@@ -147,7 +152,7 @@ TEST_F(BasicJoinTest, FullJoinBasic) {
 class MultiJoinTest : public ::testing::Test {
 protected:
     Database<decltype(UserTableDefinition), decltype(CityTableDefinition), decltype(CountryTableDefinition)> db =
-        Database{"test_database.db", UserTableDefinition, CityTableDefinition, CountryTableDefinition};
+            Database{"test_database.db", UserTableDefinition, CityTableDefinition, CountryTableDefinition};
     Table<decltype(UserTableDefinition)> &userTable = db.GetTable<decltype(UserTableDefinition)>();
     Table<decltype(CityTableDefinition)> &cityTable = db.GetTable<decltype(CityTableDefinition)>();
     Table<decltype(CountryTableDefinition)> &countryTable = db.GetTable<decltype(CountryTableDefinition)>();
@@ -182,7 +187,8 @@ TEST_F(MultiJoinTest, MultiJoin_Inner_Inner_ThreeTables) {
             .InnerJoin(cityTable, userTable[NameColumn] == cityTable[NameColumn])
             .InnerJoin(countryTable, cityTable[CityColumn] == countryTable[CityColumn])
             .Select(userTable[NameColumn], cityTable[CityColumn], countryTable[CountryColumn])
-            .Results();
+            .Results()
+            .ToVector();
 
     ASSERT_EQ(results.size(), 2);
     std::vector<std::string> countries;
@@ -210,7 +216,8 @@ TEST_F(MultiJoinTest, MultiJoin_Left_Left_ThreeTables) {
             .LeftJoin(cityTable, userTable[NameColumn] == cityTable[NameColumn])
             .LeftJoin(countryTable, cityTable[CityColumn] == countryTable[CityColumn])
             .Select(userTable[NameColumn], cityTable[CityColumn], countryTable[CountryColumn])
-            .Results();
+            .Results()
+            .ToVector();
 
     ASSERT_EQ(results.size(), 3);
     // Ensure Charlie exists with empty city/country
@@ -230,7 +237,7 @@ TEST_F(MultiJoinTest, MultiJoin_Left_Left_ThreeTables) {
 class MixedJoinTest : public ::testing::Test {
 protected:
     Database<decltype(UserTableDefinition), decltype(DeptTableDefinition), decltype(CityTableDefinition)> db =
-        Database{"test_database.db", UserTableDefinition, DeptTableDefinition, CityTableDefinition};
+            Database{"test_database.db", UserTableDefinition, DeptTableDefinition, CityTableDefinition};
     Table<decltype(UserTableDefinition)> &userTable = db.GetTable<decltype(UserTableDefinition)>();
     Table<decltype(DeptTableDefinition)> &deptTable = db.GetTable<decltype(DeptTableDefinition)>();
     Table<decltype(CityTableDefinition)> &cityTable = db.GetTable<decltype(CityTableDefinition)>();
@@ -261,7 +268,8 @@ TEST_F(MixedJoinTest, MultiJoin_Inner_Then_Left) {
             .InnerJoin(deptTable, userTable[NameColumn] == deptTable[NameColumn])
             .LeftJoin(cityTable, userTable[NameColumn] == cityTable[NameColumn])
             .Select(userTable[NameColumn], deptTable[DeptColumn], cityTable[CityColumn])
-            .Results();
+            .Results()
+            .ToVector();
 
     // Only Alice and Bob (inner with Dept), with city only for Alice
     ASSERT_EQ(results.size(), 2);

@@ -28,7 +28,7 @@ TEST_F(TableConstraintTest, TableConstraintPrimaryKeySingle) {
         (testTable.Insert<IdColumn, decltype(NameColumn)>(1, "Bob"))
     );
 
-    auto results = testTable.Select(testTable[IdColumn{}], testTable[NameColumn]).Results();
+    auto results = testTable.Select(testTable[IdColumn{}], testTable[NameColumn]).Results().ToVector();
 
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<0>(results[0]), 1);
@@ -58,7 +58,7 @@ TEST_F(TableConstraintTest, TableConstraintPrimaryKeyComposite) {
         testTable[IdColumn{}],
         testTable[NameColumn],
         testTable[AgeColumn]
-    ).Results();
+    ).Results().ToVector();
 
     EXPECT_EQ(results.size(), 2);
 }
@@ -81,7 +81,7 @@ TEST_F(TableConstraintTest, TableConstraintUniqueSingle) {
         testTable.Insert<decltype(NameColumn), EmailColumn>("Bob", "alice@example.com")
     ));
 
-    auto results = testTable.Select(testTable[NameColumn], testTable[EmailColumn{}]).Results();
+    auto results = testTable.Select(testTable[NameColumn], testTable[EmailColumn{}]).Results().ToVector();
 
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<1>(results[0]), "alice@example.com");
@@ -108,7 +108,7 @@ TEST_F(TableConstraintTest, TableConstraintUniqueComposite) {
         testTable.Insert<decltype(NameColumn), EmailColumn>("Alice", "alice@example.com")
     ));
 
-    auto results = testTable.Select(testTable[NameColumn], testTable[EmailColumn{}]).Results();
+    auto results = testTable.Select(testTable[NameColumn], testTable[EmailColumn{}]).Results().ToVector();
 
     EXPECT_EQ(results.size(), 2);
 }
@@ -146,7 +146,7 @@ TEST_F(TableConstraintTest, TableConstraintMixed) {
         testTable[IdColumn{}],
         testTable[NameColumn],
         testTable[EmailColumn{}]
-    ).Results();
+    ).Results().ToVector();
 
     EXPECT_EQ(results.size(), 1);
 }
@@ -165,7 +165,7 @@ TEST_F(TableConstraintTest, TableConstraintPrimaryKeyDesc) {
     testTable.Insert<IdColumn, decltype(NameColumn)>(1, "Alice");
     testTable.Insert<IdColumn, decltype(NameColumn)>(2, "Bob");
 
-    auto results = testTable.Select(testTable[IdColumn{}], testTable[NameColumn]).Results();
+    auto results = testTable.Select(testTable[IdColumn{}], testTable[NameColumn]).Results().ToVector();
 
     EXPECT_EQ(results.size(), 2);
 }
@@ -186,7 +186,7 @@ TEST_F(TableConstraintTest, TableConstraintUniqueWithConflict) {
     // 由於設定 IGNORE，插入重複值不會拋出異常，而是被忽略
     testTable.Insert<decltype(NameColumn), EmailColumn>("Bob", "alice@example.com");
 
-    auto results = testTable.Select(testTable[NameColumn], testTable[EmailColumn{}]).Results();
+    auto results = testTable.Select(testTable[NameColumn], testTable[EmailColumn{}]).Results().ToVector();
 
     // 只有第一筆成功插入
     EXPECT_EQ(results.size(), 1);
@@ -219,7 +219,7 @@ TEST_F(TableConstraintTest, TableConstraintPrimaryKeyMixedOrder) {
         testTable[IdColumn{}],
         testTable[NameColumn],
         testTable[AgeColumn]
-    ).Results();
+    ).Results().ToVector();
 
     EXPECT_EQ(results.size(), 2);
 }
@@ -253,7 +253,7 @@ TEST_F(TableConstraintTest, TableConstraintUniqueMixedOrder) {
         testTable[NameColumn],
         testTable[EmailColumn{}],
         testTable[PhoneColumn{}]
-    ).Results();
+    ).Results().ToVector();
 
     EXPECT_EQ(results.size(), 2);
 }
@@ -276,7 +276,7 @@ TEST_F(TableConstraintTest, TableConstraintMixedOrderedUnordered) {
     testTable.Insert<IdColumn, decltype(NameColumn), EmailColumn>(1, "Alice", "alice@example.com");
     testTable.Insert<IdColumn, decltype(NameColumn), EmailColumn>(1, "Bob", "bob@example.com");
 
-    auto results = testTable.Select(testTable[IdColumn{}], testTable[NameColumn]).Results();
+    auto results = testTable.Select(testTable[IdColumn{}], testTable[NameColumn]).Results().ToVector();
 
     EXPECT_EQ(results.size(), 2);
 }
@@ -337,7 +337,7 @@ TEST_F(TableConstraintTest, TableConstraintMultipleUnique) {
         testTable[UsernameColumn{}],
         testTable[EmailColumn{}],
         testTable[PhoneColumn{}]
-    ).Results();
+    ).Results().ToVector();
 
     EXPECT_EQ(results.size(), 2);
     EXPECT_EQ(std::get<1>(results[0]), "alice");
@@ -391,7 +391,7 @@ TEST_F(TableConstraintTest, TableConstraintMultipleCompositeUnique) {
         testTable[IdColumn{}],
         testTable[FirstNameColumn{}],
         testTable[LastNameColumn{}]
-    ).Results();
+    ).Results().ToVector();
 
     EXPECT_EQ(results.size(), 2);
 }
@@ -454,7 +454,7 @@ TEST_F(TableConstraintTest, TableConstraintPrimaryKeyWithMultipleUnique) {
         2, "Bob", "bob@example.com", "234-5678", "222-22-2222"
     );
 
-    auto results = testTable.Select(testTable[IdColumn{}], testTable[NameColumn]).Results();
+    auto results = testTable.Select(testTable[IdColumn{}], testTable[NameColumn]).Results().ToVector();
 
     EXPECT_EQ(results.size(), 2);
 }
@@ -506,7 +506,7 @@ TEST_F(TableConstraintTest, TableConstraintMixedSingleCompositeUnique) {
         testTable[IdColumn{}],
         testTable[NameColumn],
         testTable[CityColumn{}]
-    ).Results();
+    ).Results().ToVector();
 
     EXPECT_EQ(results.size(), 2);
 }

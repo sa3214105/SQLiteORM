@@ -14,14 +14,14 @@ protected:
 // ============ Insert 測試 ============
 TEST_F(InsertTest, InsertSingleColumn) {
     userTable.Insert<decltype(NameColumn)>("Alice");
-    auto results = userTable.Select(userTable[NameColumn]).Results();
+    auto results = userTable.Select(userTable[NameColumn]).Results().ToVector();
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<0>(results[0]), "Alice");
 }
 
 TEST_F(InsertTest, InsertMultipleColumns) {
     userTable.Insert<decltype(NameColumn), decltype(AgeColumn), decltype(ScoreColumn)>("Bob", 30, 95.5);
-    auto results = userTable.Select(userTable[NameColumn], userTable[AgeColumn], userTable[ScoreColumn]).Results();
+    auto results = userTable.Select(userTable[NameColumn], userTable[AgeColumn], userTable[ScoreColumn]).Results().ToVector();
     EXPECT_EQ(results.size(), 1);
     auto [name, age, score] = results[0];
     EXPECT_EQ(name, "Bob");
@@ -32,7 +32,7 @@ TEST_F(InsertTest, InsertMultipleColumns) {
 TEST_F(InsertTest, InsertMultipleRows) {
     userTable.Insert<decltype(NameColumn), decltype(AgeColumn)>("Charlie", 25);
     userTable.Insert<decltype(NameColumn), decltype(AgeColumn)>("Diana", 28);
-    auto results = userTable.Select(userTable[NameColumn], userTable[AgeColumn]).Results();
+    auto results = userTable.Select(userTable[NameColumn], userTable[AgeColumn]).Results().ToVector();
     EXPECT_EQ(results.size(), 2);
     EXPECT_EQ(std::get<0>(results[0]), "Charlie");
     EXPECT_EQ(std::get<1>(results[0]), 25);

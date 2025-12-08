@@ -1,13 +1,13 @@
 #pragma once
-#include "SQLiteStruct/Column.hpp"
-
 #include "sqlite3.h"
 #include <memory>
 #include <filesystem>
+#include <tuple>
+#include <type_traits>
 
 namespace TypeSQLite {
     template<typename T>
-    void bindValue(sqlite3_stmt *stmt, int index, const T &value) {
+    void BindValue(sqlite3_stmt *stmt, int index, const T &value) {
         if constexpr (std::is_same_v<T, std::string> || std::is_same_v<T, const char *> ||
                       std::is_same_v<std::decay_t<T>, char *>) {
             if constexpr (std::is_same_v<T, std::string>) {
@@ -83,7 +83,7 @@ namespace TypeSQLite {
                     t = ValueT{}; // 預設值
                 }
             }
-        } else if constexpr (std::is_same_v<T, std::vector<uint8_t>>) {
+        } else if constexpr (std::is_same_v<T, std::vector<uint8_t> >) {
             if (datatype == SQLITE_BLOB) {
                 auto pBytes = static_cast<const uint8_t *>(sqlite3_column_blob(stmt, colIndex));
                 auto n = static_cast<size_t>(sqlite3_column_bytes(stmt, colIndex));
@@ -102,6 +102,115 @@ namespace TypeSQLite {
         }
         return t;
     }
+
+    template<typename T, typename... Ts>
+    std::tuple<T, Ts...> GetRowData(sqlite3_stmt *stmt, int colIndex = 0) {
+        auto tuple = std::make_tuple(GetValue<T>(stmt, colIndex));
+        if constexpr (sizeof...(Ts) == 0) {
+            return tuple;
+        } else {
+            return std::tuple_cat(
+                tuple,
+                GetRowData<Ts...>(stmt, colIndex + 1)
+            );
+        }
+    }
+
+    using AutoStmtPtr = std::unique_ptr<sqlite3_stmt, decltype(&sqlite3_finalize)>;
+
+    static AutoStmtPtr MakeAutoStmtPtr() {
+        return {nullptr, sqlite3_finalize};
+    }
+
+    static AutoStmtPtr MakeAutoStmtPtr(sqlite3_stmt *stmt) {
+        return {stmt, sqlite3_finalize};
+    }
+
+    template<typename... Ts>
+    class RowIterator {
+        std::optional<std::reference_wrapper<AutoStmtPtr> > _pStmt;
+
+    public:
+        // 标准迭代器所需的类型别名
+        using iterator_category = std::input_iterator_tag;
+        using value_type = std::tuple<Ts...>;
+        using difference_type = std::ptrdiff_t;
+        using pointer = value_type *;
+        using reference = value_type;
+
+        explicit RowIterator(std::optional<std::reference_wrapper<AutoStmtPtr> > pStmt) : _pStmt(pStmt) {
+        }
+
+        std::tuple<Ts...> GetData() const {
+            if (!_pStmt) {
+                throw std::runtime_error("RowIterator does not have a valid AutoStmtPtr");
+            }
+            return GetRowData<Ts...>(_pStmt->get().get());
+        }
+
+        std::tuple<Ts...> operator*() {
+            if (!_pStmt) {
+                throw std::runtime_error("RowIterator does not have a valid AutoStmtPtr");
+            }
+            return GetRowData<Ts...>(_pStmt->get().get());
+        }
+
+        RowIterator &operator++() {
+            if (!_pStmt) {
+                throw std::runtime_error("RowIterator does not have a valid AutoStmtPtr");
+            }
+            if (sqlite3_step(_pStmt->get().get()) != SQLITE_ROW) {
+                _pStmt.reset();
+            }
+            return *this;
+        }
+
+        bool operator==(const RowIterator &other) const {
+            return _pStmt == std::nullopt ? other._pStmt == std::nullopt : other._pStmt != std::nullopt;
+        }
+
+        bool operator!=(const RowIterator &other) const {
+            return !(*this == other);
+        }
+
+        template<size_t N>
+        auto get() const {
+            return GetValue<std::tuple_element_t<N, std::tuple<Ts...> > >(_pStmt->get().get(), N);
+        }
+
+        template<size_t N>
+        friend auto get(RowIterator &it) {
+            return it.get<N>();
+        }
+    };
+
+    template<typename... Ts>
+    class QueryResult {
+        AutoStmtPtr _pStmt;
+        bool isEmpty = false;
+        bool _hasBeenIterated = false;
+
+    public:
+        explicit QueryResult(AutoStmtPtr &&pStmt) : _pStmt(std::move(pStmt)) {
+            isEmpty = sqlite3_step(_pStmt.get()) != SQLITE_ROW;
+        }
+
+        RowIterator<Ts...> begin() {
+            if (_hasBeenIterated) {
+                throw std::runtime_error("QueryResult has already been iterated. Cannot call begin() or ToVector() multiple times.");
+            }
+            _hasBeenIterated = true;
+            return RowIterator<Ts...>(isEmpty ? std::nullopt : std::make_optional(std::ref(_pStmt)));
+        }
+
+        RowIterator<Ts...> end() {
+            return RowIterator<Ts...>(std::nullopt);
+        }
+
+        std::vector<std::tuple<Ts...> > ToVector() {
+            return std::vector<std::tuple<Ts...> >(begin(), end());
+        }
+    };
 
     class SQLiteWrapper final {
     public:
@@ -155,30 +264,6 @@ namespace TypeSQLite {
             }
         };
 
-    private:
-        using AutoStmtPtr = std::unique_ptr<sqlite3_stmt, decltype(&sqlite3_finalize)>;
-
-        static AutoStmtPtr MakeAutoStmtPtr() {
-            return {nullptr, sqlite3_finalize};
-        }
-
-        static AutoStmtPtr MakeAutoStmtPtr(sqlite3_stmt *stmt) {
-            return {stmt, sqlite3_finalize};
-        }
-
-        template<typename T, typename... Ts>
-        static std::tuple<T, Ts...> GetRowData(sqlite3_stmt *stmt, int colIndex = 0) {
-            auto tuple = std::make_tuple(GetValue<T>(stmt, colIndex));
-            if constexpr (sizeof...(Ts) == 0) {
-                return tuple;
-            } else {
-                return std::tuple_cat(
-                    tuple,
-                    GetRowData<Ts...>(stmt, colIndex + 1)
-                );
-            }
-        }
-
     public:
         std::string _db_path;
         std::unique_ptr<sqlite3, decltype(&sqlite3_close)> _dbPtr = {nullptr, sqlite3_close};
@@ -202,7 +287,7 @@ namespace TypeSQLite {
         }
 
         template<typename... ResultColumns, typename... Parameters>
-        std::vector<std::tuple<ResultColumns...> > Query(const std::string &sql, Parameters... parameters) const {
+        std::vector<std::tuple<ResultColumns...> > Query2(const std::string &sql, Parameters... parameters) const {
             auto pAutoStmt = MakeAutoStmtPtr();
             {
                 sqlite3_stmt *pStmt = nullptr;
@@ -215,6 +300,7 @@ namespace TypeSQLite {
             }
 
             // 綁定參數
+            //TODO 應該可以用bindValue取代
             if constexpr (sizeof...(Parameters) > 0) {
                 int index = 1;
                 ([&]() {
@@ -235,6 +321,37 @@ namespace TypeSQLite {
             return ret;
         }
 
+        template<typename... ResultColumns, typename... Parameters>
+        QueryResult<ResultColumns...> Query(const std::string &sql, Parameters... parameters) const {
+            auto pAutoStmt = MakeAutoStmtPtr();
+            {
+                sqlite3_stmt *pStmt = nullptr;
+                if (sqlite3_prepare_v2(_dbPtr.get(), sql.c_str(), -1, &pStmt, nullptr) != SQLITE_OK) {
+                    throw std::runtime_error(
+                        "Failed to prepare statement: " + std::string(sqlite3_errmsg(_dbPtr.get())) +
+                        "\nSQL: " + sql);
+                }
+                pAutoStmt = MakeAutoStmtPtr(pStmt);
+            }
+
+            // 綁定參數
+            //TODO 應該可以用bindValue取代
+            if constexpr (sizeof...(Parameters) > 0) {
+                int index = 1;
+                ([&]() {
+                    if constexpr (std::is_same_v<Parameters, std::string>) {
+                        sqlite3_bind_text(pAutoStmt.get(), index++, parameters.c_str(), -1, SQLITE_TRANSIENT);
+                    } else if constexpr (std::is_integral_v<Parameters>) {
+                        sqlite3_bind_int(pAutoStmt.get(), index++, parameters);
+                    } else if constexpr (std::is_floating_point_v<Parameters>) {
+                        sqlite3_bind_double(pAutoStmt.get(), index++, parameters);
+                    }
+                }(), ...);
+            }
+
+            return QueryResult<ResultColumns...>(std::move(pAutoStmt));
+        }
+
         template<typename... Parameter>
         void Execute(const std::string &sql, const Parameter &... values) const {
             auto pAutoStmt = MakeAutoStmtPtr();
@@ -248,12 +365,24 @@ namespace TypeSQLite {
                 pAutoStmt = MakeAutoStmtPtr(pStmt);
             }
             int index = 1;
-            (bindValue(pAutoStmt.get(), index++, values), ...);
+            (BindValue(pAutoStmt.get(), index++, values), ...);
             if (sqlite3_step(pAutoStmt.get()) != SQLITE_DONE) {
                 throw std::runtime_error(
                     "Failed to execute statement: " + std::string(sqlite3_errmsg(_dbPtr.get())) +
                     "\nSQL: " + sql);
             }
         }
+    };
+}
+
+// std 命名空間特化，支援結構化綁定
+namespace std {
+    template<typename... Ts>
+    struct tuple_size<TypeSQLite::RowIterator<Ts...> > : integral_constant<size_t, sizeof...(Ts)> {
+    };
+
+    template<size_t N, typename... Ts>
+    struct tuple_element<N, TypeSQLite::RowIterator<Ts...> > {
+        using type = typename tuple_element<N, tuple<Ts...> >::type;
     };
 }

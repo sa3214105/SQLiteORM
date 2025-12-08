@@ -24,7 +24,7 @@ TEST_F(ExprTest, SimpleAdditionTest) {
     auto results = userTable.Select(
         userTable[NameColumn],
         userTable[AgeColumn] + 1_expr
-    ).Results();
+    ).Results().ToVector();
 
     EXPECT_EQ(results.size(), 2);
     EXPECT_EQ(std::get<1>(results[0]), 21);
@@ -36,7 +36,7 @@ TEST_F(ExprTest, SubtractionTest) {
     auto results = userTable.Select(
         userTable[NameColumn],
         userTable[AgeColumn] - 5_expr
-    ).Results();
+    ).Results().ToVector();
 
     EXPECT_EQ(results.size(), 2);
     EXPECT_EQ(std::get<1>(results[0]), 15);
@@ -48,7 +48,7 @@ TEST_F(ExprTest, MultiplicationTest) {
     auto results = userTable.Select(
         userTable[NameColumn],
         userTable[AgeColumn] * 2_expr
-    ).Results();
+    ).Results().ToVector();
 
     EXPECT_EQ(results.size(), 2);
     EXPECT_EQ(std::get<1>(results[0]), 40);
@@ -60,7 +60,7 @@ TEST_F(ExprTest, DivisionTest) {
     auto results = userTable.Select(
         userTable[NameColumn],
         userTable[AgeColumn] / 2_expr
-    ).Results();
+    ).Results().ToVector();
 
     EXPECT_EQ(results.size(), 2);
     EXPECT_EQ(std::get<1>(results[0]), 10);
@@ -72,7 +72,7 @@ TEST_F(ExprTest, ComplexExpressionTest) {
     auto results = userTable.Select(
         userTable[NameColumn],
         Brackets(userTable[AgeColumn] + 5_expr) * 2_expr
-    ).Results();
+    ).Results().ToVector();
 
     EXPECT_EQ(results.size(), 2);
     EXPECT_EQ(std::get<1>(results[0]), 50);  // (20 + 5) * 2 = 50
@@ -84,7 +84,7 @@ TEST_F(ExprTest, ComparisonInWhereTest) {
     auto results = userTable.Select(
         userTable[NameColumn],
         userTable[AgeColumn]
-    ).Where(userTable[AgeColumn] > 20_expr).Results();
+    ).Where(userTable[AgeColumn] > 20_expr).Results().ToVector();
 
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<0>(results[0]), "User2");
@@ -96,7 +96,7 @@ TEST_F(ExprTest, LogicalAndTest) {
     auto results = userTable.Select(
         userTable[NameColumn],
         userTable[AgeColumn]
-    ).Where((userTable[AgeColumn] >= 20_expr) && (userTable[AgeColumn] <= 25_expr)).Results();
+    ).Where((userTable[AgeColumn] >= 20_expr) && (userTable[AgeColumn] <= 25_expr)).Results().ToVector();
 
     EXPECT_EQ(results.size(), 2);
 }
@@ -106,7 +106,7 @@ TEST_F(ExprTest, LogicalOrTest) {
     auto results = userTable.Select(
         userTable[NameColumn],
         userTable[AgeColumn]
-    ).Where((userTable[AgeColumn] == 20_expr) || (userTable[AgeColumn] == 25_expr)).Results();
+    ).Where((userTable[AgeColumn] == 20_expr) || (userTable[AgeColumn] == 25_expr)).Results().ToVector();
 
     EXPECT_EQ(results.size(), 2);
 }
@@ -116,7 +116,7 @@ TEST_F(ExprTest, EqualityTest) {
     auto results = userTable.Select(
         userTable[NameColumn],
         userTable[AgeColumn]
-    ).Where(userTable[AgeColumn] == 25_expr).Results();
+    ).Where(userTable[AgeColumn] == 25_expr).Results().ToVector();
 
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<0>(results[0]), "User2");
@@ -127,7 +127,7 @@ TEST_F(ExprTest, InequalityTest) {
     auto results = userTable.Select(
         userTable[NameColumn],
         userTable[AgeColumn]
-    ).Where(userTable[AgeColumn] != 25_expr).Results();
+    ).Where(userTable[AgeColumn] != 25_expr).Results().ToVector();
 
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<0>(results[0]), "User1");
@@ -138,7 +138,7 @@ TEST_F(ExprTest, LessOrEqualTest) {
     auto results = userTable.Select(
         userTable[NameColumn],
         userTable[AgeColumn]
-    ).Where(userTable[AgeColumn] <= 20_expr).Results();
+    ).Where(userTable[AgeColumn] <= 20_expr).Results().ToVector();
 
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<0>(results[0]), "User1");
@@ -149,7 +149,7 @@ TEST_F(ExprTest, GreaterOrEqualTest) {
     auto results = userTable.Select(
         userTable[NameColumn],
         userTable[AgeColumn]
-    ).Where(userTable[AgeColumn] >= 25_expr).Results();
+    ).Where(userTable[AgeColumn] >= 25_expr).Results().ToVector();
 
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<0>(results[0]), "User2");
@@ -159,7 +159,7 @@ TEST_F(ExprTest, GreaterOrEqualTest) {
 TEST_F(ExprTest, ExpressionWithAggregateTest) {
     auto results = userTable.Select(
         Count(userTable[NameColumn])
-    ).Where(userTable[AgeColumn] > 18_expr).Results();
+    ).Where(userTable[AgeColumn] > 18_expr).Results().ToVector();
 
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<0>(results[0]), 2);
@@ -175,7 +175,7 @@ TEST_F(ExprTest, MultipleColumnExpressionTest) {
         userTable[NameColumn],
         userTable[AgeColumn] + 10_expr,
         userTable[ScoreColumn] * 1.1_expr
-    ).Results();
+    ).Results().ToVector();
 
     EXPECT_EQ(results.size(), 3);
     EXPECT_EQ(std::get<1>(results[2]), 40);  // 30 + 10

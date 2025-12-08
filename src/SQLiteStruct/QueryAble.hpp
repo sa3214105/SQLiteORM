@@ -26,9 +26,6 @@ namespace TypeSQLite {
         }(p);
     } || IsQueryAble<T>::value;
 
-    template<typename T>
-    concept ResultColumnConcept = ExprConcept<T>/*TableColumnConcept<T> || AggregateFunctionConcept<T>*/;
-
     template<typename Cols, SourceInfoConcept Source>
     class QueryAble {
     public:
@@ -142,7 +139,6 @@ namespace TypeSQLite {
                 }(std::index_sequence_for<ResultColumns...>{});
             }
 
-            //TODO 支援迭代器模式
             auto Results() {
                 auto sql = std::string("SELECT ") + (_isDistinct ? "DISTINCT " : "") + std::apply(
                                GetColumnNames<ResultColumns
@@ -174,6 +170,7 @@ namespace TypeSQLite {
                     return _sqlite.Query<ExprResultValueType<ResultColumns>...>(sql, params...);
                 }, all_params);
             }
+            //TODO 支援Size查詢
         };
 
     public:

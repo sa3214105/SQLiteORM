@@ -22,7 +22,7 @@ TEST_F(TransactionTest, TransactionCommit) {
     });
 
     auto results = userTable.Select(userTable[NameColumn], userTable[AgeColumn])
-            .Where(userTable[NameColumn] == "TxUser"_expr).Results();
+            .Where(userTable[NameColumn] == "TxUser"_expr).Results().ToVector();
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<1>(results[0]), 99);
 }
@@ -34,7 +34,7 @@ TEST_F(TransactionTest, TransactionRollback) {
     }));
 
     auto results = userTable.Select(userTable[NameColumn], userTable[AgeColumn])
-            .Where(userTable[NameColumn] == "TxRollback"_expr).Results();
+            .Where(userTable[NameColumn] == "TxRollback"_expr).Results().ToVector();
     EXPECT_EQ(results.size(), 0);
 }
 
@@ -45,7 +45,7 @@ TEST_F(TransactionTest, TransactionExplicitCommit) {
     });
 
     auto results = userTable.Select(userTable[NameColumn], userTable[AgeColumn])
-            .Where(userTable[NameColumn] == "ExplicitCommit"_expr).Results();
+            .Where(userTable[NameColumn] == "ExplicitCommit"_expr).Results().ToVector();
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<1>(results[0]), 77);
 }
@@ -57,6 +57,6 @@ TEST_F(TransactionTest, TransactionExplicitRollback) {
     });
 
     auto results = userTable.Select(userTable[NameColumn], userTable[AgeColumn])
-            .Where(userTable[NameColumn] == "ExplicitRollback"_expr).Results();
+            .Where(userTable[NameColumn] == "ExplicitRollback"_expr).Results().ToVector();
     EXPECT_EQ(results.size(), 0);
 }

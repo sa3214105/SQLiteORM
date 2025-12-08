@@ -25,7 +25,7 @@ TEST_F(TableOptionTest, TableOptionWithoutRowId) {
     testTable.Insert<IdColumn, decltype(NameColumn)>(1, "Alice");
     testTable.Insert<IdColumn, decltype(NameColumn)>(2, "Bob");
 
-    auto results = testTable.Select(testTable[IdColumn{}], testTable[NameColumn]).Results();
+    auto results = testTable.Select(testTable[IdColumn{}], testTable[NameColumn]).Results().ToVector();
 
     EXPECT_EQ(results.size(), 2);
     EXPECT_EQ(std::get<0>(results[0]), 1);
@@ -50,7 +50,7 @@ TEST_F(TableOptionTest, TableOptionStrict) {
         testTable[IdColumn{}],
         testTable[NameColumn],
         testTable[AgeColumn]
-    ).Results();
+    ).Results().ToVector();
 
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<0>(results[0]), 1);
@@ -76,7 +76,7 @@ TEST_F(TableOptionTest, TableOptionWithoutRowIdAndStrict) {
         testTable[IdColumn{}],
         testTable[NameColumn],
         testTable[EmailColumn{}]
-    ).Results();
+    ).Results().ToVector();
 
     EXPECT_EQ(results.size(), 2);
 }
@@ -105,7 +105,7 @@ TEST_F(TableOptionTest, TableOptionWithoutRowIdCompositeKey) {
         testTable[IdColumn{}],
         testTable[CategoryColumn{}],
         testTable[NameColumn]
-    ).Results();
+    ).Results().ToVector();
 
     EXPECT_EQ(results.size(), 2);
 }
@@ -156,7 +156,7 @@ TEST_F(TableOptionTest, TableOptionStrictWithConstraints) {
     auto results = testTable.Select(
         testTable[IdColumn{}],
         testTable[NameColumn]
-    ).Results();
+    ).Results().ToVector();
 
     EXPECT_EQ(results.size(), 1);
 }

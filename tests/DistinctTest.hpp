@@ -76,7 +76,7 @@ protected:
 // ============ DISTINCT 基本測試 ============
 TEST_F(DistinctBasicTest, DistinctSingleColumn) {
     // 使用 DISTINCT 查詢唯一的名稱
-    auto results = userTable.Select(userTable[NameColumn]).Distinct().Results();
+    auto results = userTable.Select(userTable[NameColumn]).Distinct().Results().ToVector();
 
     EXPECT_EQ(results.size(), 3); // Alice, Bob, Charlie
 
@@ -93,11 +93,11 @@ TEST_F(DistinctBasicTest, DistinctSingleColumn) {
 
 TEST_F(DistinctBasicTest, DistinctWithDuplicates) {
     // 不使用 DISTINCT
-    auto results_without_distinct = userTable.Select(userTable[NameColumn]).Results();
+    auto results_without_distinct = userTable.Select(userTable[NameColumn]).Results().ToVector();
     EXPECT_EQ(results_without_distinct.size(), 5);
 
     // 使用 DISTINCT
-    auto results_with_distinct = userTable.Select(userTable[NameColumn]).Distinct().Results();
+    auto results_with_distinct = userTable.Select(userTable[NameColumn]).Distinct().Results().ToVector();
     EXPECT_EQ(results_with_distinct.size(), 3); // 只有 Alice, Bob, Charlie
 }
 
@@ -110,7 +110,7 @@ TEST_F(DistinctEmptyTest, DistinctIntegerColumn) {
     userTable.Insert<decltype(AgeColumn)>(35);
 
     // 使用 DISTINCT 查詢唯一的年齡
-    auto results = userTable.Select(userTable[AgeColumn]).Distinct().Results();
+    auto results = userTable.Select(userTable[AgeColumn]).Distinct().Results().ToVector();
     EXPECT_EQ(results.size(), 3); // 25, 30, 35
 }
 
@@ -123,7 +123,7 @@ TEST_F(DistinctEmptyTest, DistinctRealColumn) {
     userTable.Insert<decltype(ScoreColumn)>(95.5);
 
     // 使用 DISTINCT 查詢唯一的分數
-    auto results = userTable.Select(userTable[ScoreColumn]).Distinct().Results();
+    auto results = userTable.Select(userTable[ScoreColumn]).Distinct().Results().ToVector();
     EXPECT_EQ(results.size(), 3); // 85.5, 90.0, 95.5
 }
 
@@ -133,7 +133,7 @@ TEST_F(DistinctMultiColumnTest, DistinctMultipleColumns) {
     auto results = userTable
             .Select(userTable[NameColumn], userTable[AgeColumn])
             .Distinct()
-            .Results();
+            .Results().ToVector();
 
     EXPECT_EQ(results.size(), 3); // (Alice,25), (Bob,30), (Alice,30)
 }
@@ -149,7 +149,7 @@ TEST_F(DistinctEmptyTest, DistinctThreeColumns) {
     auto results = userTable
             .Select(userTable[NameColumn], userTable[AgeColumn], userTable[ScoreColumn])
             .Distinct()
-            .Results();
+            .Results().ToVector();
 
     EXPECT_EQ(results.size(), 3); // 應該有三筆唯一的記錄
 }
@@ -165,7 +165,7 @@ TEST_F(DistinctMultiColumnTest, DistinctWithWhere) {
             .Select(userTable[NameColumn])
             .Where(userTable[AgeColumn] >= 30_expr)
             .Distinct()
-            .Results();
+            .Results().ToVector();
 
     EXPECT_EQ(results.size(), 3); // Alice, Bob, Charlie
 }
@@ -182,7 +182,7 @@ TEST_F(DistinctEmptyTest, DistinctWithWhereEqual) {
             .Select(userTable[NameColumn])
             .Where(userTable[AgeColumn] == 25_expr)
             .Distinct()
-            .Results();
+            .Results().ToVector();
 
     EXPECT_EQ(results.size(), 2); // Alice, Bob
 }
@@ -193,7 +193,7 @@ TEST_F(DistinctFullColumnTest, DistinctWithComplexWhere) {
             .Select(userTable[NameColumn])
             .Where((userTable[AgeColumn] >= 25_expr) && (userTable[ScoreColumn] >= 88.0_expr))
             .Distinct()
-            .Results();
+            .Results().ToVector();
 
     EXPECT_EQ(results.size(), 2); // Alice, Charlie
 }
@@ -208,7 +208,7 @@ TEST_F(DistinctBasicTest, DistinctWithLimit) {
             .Select(userTable[NameColumn])
             .Distinct()
             .LimitOffset(2)
-            .Results();
+            .Results().ToVector();
 
     EXPECT_EQ(results.size(), 2); // 只取前兩個唯一值
 }
@@ -222,7 +222,7 @@ TEST_F(DistinctBasicTest, DistinctWithLimitOffset) {
             .Select(userTable[NameColumn])
             .Distinct()
             .LimitOffset(2, 1)
-            .Results();
+            .Results().ToVector();
 
     EXPECT_EQ(results.size(), 2); // 跳過第一個，取兩個
 }
@@ -239,7 +239,7 @@ TEST_F(DistinctEmptyTest, DistinctWithOffset) {
             .Select(userTable[AgeColumn])
             .Distinct()
             .LimitOffset(10, 2)
-            .Results();
+            .Results().ToVector();
 
     EXPECT_EQ(results.size(), 3); // 應該還有 3 個唯一值
 }
@@ -247,7 +247,7 @@ TEST_F(DistinctEmptyTest, DistinctWithOffset) {
 // ============ DISTINCT 邊界情況測試 ============
 TEST_F(DistinctEmptyTest, DistinctNoData) {
     // 不插入任何數據
-    auto results = userTable.Select(userTable[NameColumn]).Distinct().Results();
+    auto results = userTable.Select(userTable[NameColumn]).Distinct().Results().ToVector();
     EXPECT_EQ(results.size(), 0);
 }
 
@@ -255,7 +255,7 @@ TEST_F(DistinctEmptyTest, DistinctSingleRow) {
     // 只插入一筆數據
     userTable.Insert<decltype(NameColumn)>("Alice");
 
-    auto results = userTable.Select(userTable[NameColumn]).Distinct().Results();
+    auto results = userTable.Select(userTable[NameColumn]).Distinct().Results().ToVector();
     EXPECT_EQ(results.size(), 1);
     EXPECT_EQ(std::get<0>(results[0]), "Alice");
 }
@@ -266,7 +266,7 @@ TEST_F(DistinctEmptyTest, DistinctAllUnique) {
     userTable.Insert<decltype(NameColumn)>("Bob");
     userTable.Insert<decltype(NameColumn)>("Charlie");
 
-    auto results = userTable.Select(userTable[NameColumn]).Distinct().Results();
+    auto results = userTable.Select(userTable[NameColumn]).Distinct().Results().ToVector();
     EXPECT_EQ(results.size(), 3); // 所有都是唯一的
 }
 
@@ -276,7 +276,7 @@ TEST_F(DistinctEmptyTest, DistinctAllSame) {
         userTable.Insert<decltype(NameColumn)>("Alice");
     }
 
-    auto results = userTable.Select(userTable[NameColumn]).Distinct().Results();
+    auto results = userTable.Select(userTable[NameColumn]).Distinct().Results().ToVector();
     EXPECT_EQ(results.size(), 1); // 只有一個唯一值
     EXPECT_EQ(std::get<0>(results[0]), "Alice");
 }
@@ -284,7 +284,7 @@ TEST_F(DistinctEmptyTest, DistinctAllSame) {
 // ============ DISTINCT 與 NULL 值測試 ============
 TEST_F(DistinctBasicTest, DistinctWithNullValues) {
     // DISTINCT 應該正確處理
-    auto results = userTable.Select(userTable[NameColumn]).Distinct().Results();
+    auto results = userTable.Select(userTable[NameColumn]).Distinct().Results().ToVector();
     EXPECT_EQ(results.size(), 3); // Alice, Bob, Charlie
 }
 
@@ -305,7 +305,7 @@ TEST_F(DistinctEmptyTest, DistinctWithWhereAndLimit) {
             .Where(userTable[AgeColumn] > 22_expr)
             .Distinct()
             .LimitOffset(2)
-            .Results();
+            .Results().ToVector();
 
     EXPECT_EQ(results.size(), 2);
 }
@@ -317,7 +317,7 @@ TEST_F(DistinctFullColumnTest, DistinctMultiColumnsWithWhereAndLimit) {
             .Where(userTable[ScoreColumn] >= 85.0_expr)
             .Distinct()
             .LimitOffset(2)
-            .Results();
+            .Results().ToVector();
 
     EXPECT_EQ(results.size(), 2);
 }
@@ -329,7 +329,7 @@ TEST_F(DistinctMultiColumnTest, DistinctBeforeWhere) {
             .Select(userTable[NameColumn])
             .Distinct()
             .Where(userTable[AgeColumn] >= 25_expr)
-            .Results();
+            .Results().ToVector();
 
     EXPECT_EQ(results.size(), 2); // Alice, Bob
 }
@@ -347,7 +347,7 @@ TEST_F(DistinctEmptyTest, DistinctBeforeLimitOffset) {
             .Select(userTable[NameColumn])
             .Distinct()
             .LimitOffset(2)
-            .Results();
+            .Results().ToVector();
 
     EXPECT_EQ(results.size(), 2);
 }
@@ -368,7 +368,7 @@ TEST_F(DistinctEmptyTest, DistinctWithAllOperations) {
             .Distinct()
             .Where(userTable[ScoreColumn] > 80.0_expr)
             .LimitOffset(3, 1)
-            .Results();
+            .Results().ToVector();
 
     // 驗證結果數量
     EXPECT_LE(results.size(), 3);

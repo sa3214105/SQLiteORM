@@ -25,7 +25,7 @@ protected:
 TEST_F(AggregateFunctionTest, CountFunction) {
     auto results = userTable.Select(
         Count(userTable[NameColumn])
-    ).Results();
+    ).Results().ToVector();
 
     ASSERT_EQ(results.size(), 1);
     auto count = std::get<0>(results[0]);
@@ -36,7 +36,7 @@ TEST_F(AggregateFunctionTest, CountFunction) {
 TEST_F(AggregateFunctionTest, AvgFunction) {
     auto results = userTable.Select(
         Avg(userTable[ScoreColumn])
-    ).Results();
+    ).Results().ToVector();
 
     ASSERT_EQ(results.size(), 1);
     auto avg_score = std::get<0>(results[0]);
@@ -47,7 +47,7 @@ TEST_F(AggregateFunctionTest, AvgFunction) {
 TEST_F(AggregateFunctionTest, MaxFunction) {
     auto results = userTable.Select(
         Max(userTable[AgeColumn])
-    ).Results();
+    ).Results().ToVector();
 
     ASSERT_EQ(results.size(), 1);
     auto max_age = std::get<0>(results[0]);
@@ -58,7 +58,7 @@ TEST_F(AggregateFunctionTest, MaxFunction) {
 TEST_F(AggregateFunctionTest, MinFunction) {
     auto results = userTable.Select(
         Min(userTable[ScoreColumn])
-    ).Results();
+    ).Results().ToVector();
 
     ASSERT_EQ(results.size(), 1);
     auto min_score = std::get<0>(results[0]);
@@ -69,7 +69,7 @@ TEST_F(AggregateFunctionTest, MinFunction) {
 TEST_F(AggregateFunctionTest, SumFunction) {
     auto results = userTable.Select(
         Sum(userTable[AgeColumn])
-    ).Results();
+    ).Results().ToVector();
 
     ASSERT_EQ(results.size(), 1);
     auto sum_age = std::get<0>(results[0]);
@@ -80,7 +80,7 @@ TEST_F(AggregateFunctionTest, SumFunction) {
 TEST_F(AggregateFunctionTest, TotalFunction) {
     auto results = userTable.Select(
         Total(userTable[ScoreColumn])
-    ).Results();
+    ).Results().ToVector();
 
     ASSERT_EQ(results.size(), 1);
     auto total_score = std::get<0>(results[0]);
@@ -93,7 +93,7 @@ TEST_F(AggregateFunctionTest, MultipleAggregateFunctions) {
         Count(userTable[NameColumn]),
         Avg(userTable[AgeColumn]),
         Max(userTable[ScoreColumn])
-    ).Results();
+    ).Results().ToVector();
 
     ASSERT_EQ(results.size(), 1);
     auto [count, avg_age, max_score] = results[0];
@@ -106,7 +106,7 @@ TEST_F(AggregateFunctionTest, MultipleAggregateFunctions) {
 TEST_F(AggregateFunctionTest, AggregateFunctionWithWhere) {
     auto results = userTable.Select(
         Avg(userTable[ScoreColumn])
-    ).Where(userTable[AgeColumn] > 25_expr).Results();
+    ).Where(userTable[AgeColumn] > 25_expr).Results().ToVector();
 
     ASSERT_EQ(results.size(), 1);
     auto avg_score = std::get<0>(results[0]);
@@ -118,7 +118,7 @@ TEST_F(AggregateFunctionTest, GroupBySingleColumn) {
     auto results = userTable.Select(
         userTable[AgeColumn],
         Count(userTable[NameColumn])
-    ).GroupBy(userTable[AgeColumn]).Results();
+    ).GroupBy(userTable[AgeColumn]).Results().ToVector();
 
     ASSERT_EQ(results.size(), 3); // 3 個不同的年齡組
 
@@ -141,7 +141,7 @@ TEST_F(AggregateFunctionTest, GroupByWithMultipleAggregates) {
         Avg(userTable[ScoreColumn]),
         Min(userTable[ScoreColumn]),
         Max(userTable[ScoreColumn])
-    ).GroupBy(userTable[AgeColumn]).Results();
+    ).GroupBy(userTable[AgeColumn]).Results().ToVector();
 
     ASSERT_EQ(results.size(), 3);
 
@@ -173,7 +173,7 @@ TEST_F(AggregateFunctionTest, GroupByWithWhere) {
         Avg(userTable[ScoreColumn])
     ).Where(userTable[ScoreColumn] > 80.0_expr)
      .GroupBy(userTable[AgeColumn])
-     .Results();
+     .Results().ToVector();
 
     // 只有 score > 80 的記錄: Alice(25, 85.5), Bob(30, 92.0), David(35, 88.0)
     ASSERT_EQ(results.size(), 3);
@@ -197,7 +197,7 @@ TEST_F(AggregateFunctionTest, SumWithGroupBy) {
     auto results = userTable.Select(
         userTable[AgeColumn],
         Sum(userTable[ScoreColumn])
-    ).GroupBy(userTable[AgeColumn]).Results();
+    ).GroupBy(userTable[AgeColumn]).Results().ToVector();
 
     ASSERT_EQ(results.size(), 3);
 
@@ -217,7 +217,7 @@ TEST_F(AggregateFunctionTest, MinMaxCombination) {
     auto results = userTable.Select(
         Min(userTable[ScoreColumn]),
         Max(userTable[ScoreColumn])
-    ).Results();
+    ).Results().ToVector();
 
     ASSERT_EQ(results.size(), 1);
     auto [min_score, max_score] = results[0];
@@ -231,7 +231,7 @@ TEST_F(AggregateFunctionTest, AggregateFunctionOnEmptyTable) {
 
     auto results = userTable.Select(
         Count(userTable[NameColumn])
-    ).Results();
+    ).Results().ToVector();
 
     ASSERT_EQ(results.size(), 1);
     auto count = std::get<0>(results[0]);
@@ -242,7 +242,7 @@ TEST_F(AggregateFunctionTest, AggregateFunctionOnEmptyTable) {
 TEST_F(AggregateFunctionTest, CountWithWhere) {
     auto results = userTable.Select(
         Count(userTable[NameColumn])
-    ).Where(userTable[AgeColumn] == 25_expr).Results();
+    ).Where(userTable[AgeColumn] == 25_expr).Results().ToVector();
 
     ASSERT_EQ(results.size(), 1);
     auto count = std::get<0>(results[0]);
@@ -254,7 +254,7 @@ TEST_F(AggregateFunctionTest, TotalVsSum) {
     auto results = userTable.Select(
         Sum(userTable[ScoreColumn]),
         Total(userTable[ScoreColumn])
-    ).Results();
+    ).Results().ToVector();
 
     ASSERT_EQ(results.size(), 1);
     auto [sum_score, total_score] = results[0];
@@ -271,7 +271,7 @@ TEST_F(AggregateFunctionTest, AllBasicAggregateFunctions) {
         Min(userTable[ScoreColumn]),
         Max(userTable[ScoreColumn]),
         Total(userTable[AgeColumn])
-    ).Results();
+    ).Results().ToVector();
 
     ASSERT_EQ(results.size(), 1);
     auto [count, sum_age, avg_score, min_score, max_score, total_age] = results[0];
@@ -290,7 +290,7 @@ TEST_F(AggregateFunctionTest, AvgWithWhereExactCalculation) {
         Count(userTable[NameColumn]),
         Avg(userTable[ScoreColumn]),
         Sum(userTable[ScoreColumn])
-    ).Where(userTable[AgeColumn] == 25_expr).Results();
+    ).Where(userTable[AgeColumn] == 25_expr).Results().ToVector();
 
     ASSERT_EQ(results.size(), 1);
     auto [count, avg_score, sum_score] = results[0];
@@ -305,7 +305,7 @@ TEST_F(AggregateFunctionTest, MinMaxWithCondition) {
     auto results = userTable.Select(
         Min(userTable[AgeColumn]),
         Max(userTable[AgeColumn])
-    ).Where(userTable[ScoreColumn] > 80.0_expr).Results();
+    ).Where(userTable[ScoreColumn] > 80.0_expr).Results().ToVector();
 
     ASSERT_EQ(results.size(), 1);
     auto [min_age, max_age] = results[0];
@@ -319,19 +319,19 @@ TEST_F(AggregateFunctionTest, CountWithDifferentConditions) {
     // 測試大於條件
     auto results1 = userTable.Select(
         Count(userTable[NameColumn])
-    ).Where(userTable[AgeColumn] > 25_expr).Results();
+    ).Where(userTable[AgeColumn] > 25_expr).Results().ToVector();
     EXPECT_EQ(std::get<0>(results1[0]), 2); // Bob, David
 
     // 測試大於等於條件
     auto results2 = userTable.Select(
         Count(userTable[NameColumn])
-    ).Where(userTable[AgeColumn] >= 25_expr).Results();
+    ).Where(userTable[AgeColumn] >= 25_expr).Results().ToVector();
     EXPECT_EQ(std::get<0>(results2[0]), 4); // All
 
     // 測試小於條件
     auto results3 = userTable.Select(
         Count(userTable[NameColumn])
-    ).Where(userTable[AgeColumn] < 30_expr).Results();
+    ).Where(userTable[AgeColumn] < 30_expr).Results().ToVector();
     EXPECT_EQ(std::get<0>(results3[0]), 2); // Alice, Charlie
 }
 
@@ -340,13 +340,13 @@ TEST_F(AggregateFunctionTest, SumOnDifferentTypes) {
     // Integer 類型
     auto results_int = userTable.Select(
         Sum(userTable[AgeColumn])
-    ).Results();
+    ).Results().ToVector();
     EXPECT_EQ(std::get<0>(results_int[0]), 115);
 
     // Real 類型
     auto results_real = userTable.Select(
         Sum(userTable[ScoreColumn])
-    ).Results();
+    ).Results().ToVector();
     EXPECT_NEAR(std::get<0>(results_real[0]), 344.0, 0.1);
 }
 
@@ -356,7 +356,7 @@ TEST_F(AggregateFunctionTest, AggregateFunctionWithLimit) {
     auto results = userTable.Select(
         Count(userTable[NameColumn]),
         Avg(userTable[ScoreColumn])
-    ).LimitOffset(1).Results();
+    ).LimitOffset(1).Results().ToVector();
 
     ASSERT_EQ(results.size(), 1);
     auto [count, avg_score] = results[0];
@@ -369,7 +369,7 @@ TEST_F(AggregateFunctionTest, GroupByWithLimit) {
     auto results = userTable.Select(
         userTable[AgeColumn],
         Count(userTable[NameColumn])
-    ).GroupBy(userTable[AgeColumn]).LimitOffset(2).Results();
+    ).GroupBy(userTable[AgeColumn]).LimitOffset(2).Results().ToVector();
 
     ASSERT_EQ(results.size(), 2); // 限制只返回 2 組
 }
@@ -379,7 +379,7 @@ TEST_F(AggregateFunctionTest, GroupByWithLimitOffset) {
     auto results = userTable.Select(
         userTable[AgeColumn],
         Count(userTable[NameColumn])
-    ).GroupBy(userTable[AgeColumn]).LimitOffset(1, 1).Results();
+    ).GroupBy(userTable[AgeColumn]).LimitOffset(1, 1).Results().ToVector();
 
     ASSERT_EQ(results.size(), 1); // 跳過第一組，只返回 1 組
 }
@@ -395,7 +395,7 @@ TEST_F(AggregateFunctionTest, ComplexAggregateQuery) {
         Max(userTable[ScoreColumn])
     ).Where(userTable[ScoreColumn] > 75_expr)
      .GroupBy(userTable[AgeColumn])
-     .Results();
+     .Results().ToVector();
 
     ASSERT_GT(results.size(), 0);
 
@@ -412,7 +412,7 @@ TEST_F(AggregateFunctionTest, TotalWithGroupBy) {
     auto results = userTable.Select(
         userTable[AgeColumn],
         Total(userTable[ScoreColumn])
-    ).GroupBy(userTable[AgeColumn]).Results();
+    ).GroupBy(userTable[AgeColumn]).Results().ToVector();
 
     ASSERT_EQ(results.size(), 3);
 
@@ -434,7 +434,7 @@ TEST_F(AggregateFunctionTest, GroupByOnEmptyTable) {
     auto results = userTable.Select(
         userTable[AgeColumn],
         Count(userTable[NameColumn])
-    ).GroupBy(userTable[AgeColumn]).Results();
+    ).GroupBy(userTable[AgeColumn]).Results().ToVector();
 
     ASSERT_EQ(results.size(), 0); // 空表應該返回空結果
 }
@@ -449,7 +449,7 @@ TEST_F(AggregateFunctionTest, AllAggregateFunctionsWithGroupBy) {
         Min(userTable[ScoreColumn]),
         Max(userTable[ScoreColumn]),
         Total(userTable[ScoreColumn])
-    ).GroupBy(userTable[AgeColumn]).Results();
+    ).GroupBy(userTable[AgeColumn]).Results().ToVector();
 
     ASSERT_EQ(results.size(), 3);
 
