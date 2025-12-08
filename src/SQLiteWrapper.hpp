@@ -6,39 +6,21 @@
 #include <filesystem>
 
 namespace TypeSQLite {
-    //TODO Column類型不要在這邊做處理
     template<typename T>
     void bindValue(sqlite3_stmt *stmt, int index, const T &value) {
-        if constexpr (ColumnOrTableColumnConcept<T>) {
-            // 處理 Column 類型
-            if constexpr (T::type == ExprResultType::TEXT) {
-                sqlite3_bind_text(stmt, index, value.value.c_str(), -1, SQLITE_TRANSIENT);
-            } else if constexpr (T::type == ExprResultType::NUMERIC) {
-                sqlite3_bind_double(stmt, index, static_cast<double>(value.value));
-            } else if constexpr (T::type == ExprResultType::INTEGER) {
-                sqlite3_bind_int(stmt, index, value.value);
-            } else if constexpr (T::type == ExprResultType::REAL) {
-                sqlite3_bind_double(stmt, index, value.value);
-            } else if constexpr (T::type == ExprResultType::BLOB) {
-                sqlite3_bind_blob(stmt, index, value.value.data(), static_cast<int>(value.value.size()),
-                                  SQLITE_TRANSIENT);
-            }
-        } else {
-            // 處理原始值類型
-            if constexpr (std::is_same_v<T, std::string> || std::is_same_v<T, const char *> ||
-                          std::is_same_v<std::decay_t<T>, char *>) {
-                if constexpr (std::is_same_v<T, std::string>) {
-                    sqlite3_bind_text(stmt, index, value.c_str(), -1, SQLITE_TRANSIENT);
-                } else {
-                    sqlite3_bind_text(stmt, index, value, -1, SQLITE_TRANSIENT);
-                }
-            } else if constexpr (std::is_integral_v<T>) {
-                sqlite3_bind_int(stmt, index, value);
-            } else if constexpr (std::is_floating_point_v<T>) {
-                sqlite3_bind_double(stmt, index, value);
+        if constexpr (std::is_same_v<T, std::string> || std::is_same_v<T, const char *> ||
+                      std::is_same_v<std::decay_t<T>, char *>) {
+            if constexpr (std::is_same_v<T, std::string>) {
+                sqlite3_bind_text(stmt, index, value.c_str(), -1, SQLITE_TRANSIENT);
             } else {
-                static_assert([]() { return false; }(), "Unsupported type for bindValue");
+                sqlite3_bind_text(stmt, index, value, -1, SQLITE_TRANSIENT);
             }
+        } else if constexpr (std::is_integral_v<T>) {
+            sqlite3_bind_int(stmt, index, value);
+        } else if constexpr (std::is_floating_point_v<T>) {
+            sqlite3_bind_double(stmt, index, value);
+        } else {
+            static_assert([]() { return false; }(), "Unsupported type for bindValue");
         }
     }
 
