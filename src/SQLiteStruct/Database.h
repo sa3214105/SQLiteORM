@@ -59,7 +59,7 @@ namespace TypeSQLite {
 
     public:
         explicit Database(const std::string &db_path, TableOrIndexDefs... table_defs)
-            : _sqlite(db_path, false, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE),
+            : _sqlite(db_path, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE),
               _tables(CreateTables(_sqlite, table_defs...)),
               _indexes(CreateIndexes(_sqlite, table_defs...)) {
         }

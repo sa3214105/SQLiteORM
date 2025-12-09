@@ -1,7 +1,8 @@
 #pragma once
+#include <list>
+
 #include "sqlite3.h"
 #include <memory>
-#include <filesystem>
 #include <tuple>
 #include <type_traits>
 
@@ -197,7 +198,8 @@ namespace TypeSQLite {
 
         RowIterator<Ts...> begin() {
             if (_hasBeenIterated) {
-                throw std::runtime_error("QueryResult has already been iterated. Cannot call begin() or ToVector() multiple times.");
+                throw std::runtime_error(
+                    "QueryResult has already been iterated. Cannot call begin() or ToVector() multiple times.");
             }
             _hasBeenIterated = true;
             return RowIterator<Ts...>(isEmpty ? std::nullopt : std::make_optional(std::ref(_pStmt)));
@@ -209,6 +211,10 @@ namespace TypeSQLite {
 
         std::vector<std::tuple<Ts...> > ToVector() {
             return std::vector<std::tuple<Ts...> >(begin(), end());
+        }
+
+        std::list<std::tuple<Ts...> > ToList() {
+            return std::list<std::tuple<Ts...> >(begin(), end());
         }
     };
 
@@ -268,57 +274,15 @@ namespace TypeSQLite {
         std::string _db_path;
         std::unique_ptr<sqlite3, decltype(&sqlite3_close)> _dbPtr = {nullptr, sqlite3_close};
 
-        explicit SQLiteWrapper(const std::string &dbPath, const bool removeExisting = false,
+        explicit SQLiteWrapper(const std::string &dbPath,
                                const int flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE
         ) : _db_path(std::move(dbPath)) {
-            // Optionally delete existing DB file if requested (useful for tests)
-            if (removeExisting) {
-                std::error_code ec;
-                if (std::filesystem::exists(_db_path, ec)) {
-                    std::filesystem::remove(_db_path, ec);
-                }
-            }
             sqlite3 *pDb = nullptr;
             if (sqlite3_open_v2(_db_path.c_str(), &pDb, flags, nullptr) != SQLITE_OK) {
                 std::string errMsg = pDb ? sqlite3_errmsg(pDb) : "Unknown error";
                 throw std::runtime_error("Can't open database: " + errMsg + "\nPath: " + _db_path);
             }
             _dbPtr = {pDb, sqlite3_close};
-        }
-
-        template<typename... ResultColumns, typename... Parameters>
-        std::vector<std::tuple<ResultColumns...> > Query2(const std::string &sql, Parameters... parameters) const {
-            auto pAutoStmt = MakeAutoStmtPtr();
-            {
-                sqlite3_stmt *pStmt = nullptr;
-                if (sqlite3_prepare_v2(_dbPtr.get(), sql.c_str(), -1, &pStmt, nullptr) != SQLITE_OK) {
-                    throw std::runtime_error(
-                        "Failed to prepare statement: " + std::string(sqlite3_errmsg(_dbPtr.get())) +
-                        "\nSQL: " + sql);
-                }
-                pAutoStmt = MakeAutoStmtPtr(pStmt);
-            }
-
-            // 綁定參數
-            //TODO 應該可以用bindValue取代
-            if constexpr (sizeof...(Parameters) > 0) {
-                int index = 1;
-                ([&]() {
-                    if constexpr (std::is_same_v<Parameters, std::string>) {
-                        sqlite3_bind_text(pAutoStmt.get(), index++, parameters.c_str(), -1, SQLITE_TRANSIENT);
-                    } else if constexpr (std::is_integral_v<Parameters>) {
-                        sqlite3_bind_int(pAutoStmt.get(), index++, parameters);
-                    } else if constexpr (std::is_floating_point_v<Parameters>) {
-                        sqlite3_bind_double(pAutoStmt.get(), index++, parameters);
-                    }
-                }(), ...);
-            }
-
-            std::vector<std::tuple<ResultColumns...> > ret;
-            while (sqlite3_step(pAutoStmt.get()) == SQLITE_ROW) {
-                ret.push_back(GetRowData<ResultColumns...>(pAutoStmt.get()));
-            }
-            return ret;
         }
 
         template<typename... ResultColumns, typename... Parameters>
@@ -333,22 +297,8 @@ namespace TypeSQLite {
                 }
                 pAutoStmt = MakeAutoStmtPtr(pStmt);
             }
-
-            // 綁定參數
-            //TODO 應該可以用bindValue取代
-            if constexpr (sizeof...(Parameters) > 0) {
-                int index = 1;
-                ([&]() {
-                    if constexpr (std::is_same_v<Parameters, std::string>) {
-                        sqlite3_bind_text(pAutoStmt.get(), index++, parameters.c_str(), -1, SQLITE_TRANSIENT);
-                    } else if constexpr (std::is_integral_v<Parameters>) {
-                        sqlite3_bind_int(pAutoStmt.get(), index++, parameters);
-                    } else if constexpr (std::is_floating_point_v<Parameters>) {
-                        sqlite3_bind_double(pAutoStmt.get(), index++, parameters);
-                    }
-                }(), ...);
-            }
-
+            int index = 1;
+            (BindValue(pAutoStmt.get(), index++, parameters), ...);
             return QueryResult<ResultColumns...>(std::move(pAutoStmt));
         }
 
