@@ -2,6 +2,7 @@
 #include "InsertTest.hpp"
 #include "UpdateTest.hpp"
 #include "DeleteTest.hpp"
+#include "UpsertTest.hpp"
 #include "TransationTest.hpp"
 #include "JoinTest.hpp"
 #include "ColumnConstraintsTest.hpp"

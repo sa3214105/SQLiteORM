@@ -202,6 +202,8 @@ namespace TypeSQLite {
 
         template<typename... U>
         void Insert(ExprResultValueType<U>... values) {
+            //TODO 重啟檢查
+
             // static_assert(IsTypeGroupSubset<TypeGroup<U...>, columns>(),
             //               "Insert values must be subset of table columns");
             std::string sql = std::string("INSERT INTO ") + std::string(name) + " (";
@@ -222,9 +224,10 @@ namespace TypeSQLite {
         // 批量插入支援
         template<typename... U>
         void InsertMany(const std::vector<std::tuple<ExprResultValueType<U>...> > &rows) {
+            //TODO 重啟檢查
+
             // static_assert(IsTypeGroupSubset<TypeGroup<U...>, columns>(),
             //               "Insert values must be subset of table columns");
-
             if (rows.empty()) {
                 return;
             }
@@ -253,8 +256,33 @@ namespace TypeSQLite {
             // Transaction 解構子會自動 Commit（如果沒有異常）或 Rollback（如果有異常）
         }
 
+        template<typename... U>
+        void Upsert(ExprResultValueType<U>... values) {
+            //TODO 重啟檢查
+
+            // static_assert(IsTypeGroupSubset<TypeGroup<U...>, columns>(),
+            //               "Upsert values must be subset of table columns");
+            std::string sql = std::string("INSERT INTO ") + std::string(name) + " (";
+            sql += GetColumnNamesWithOutTableName<U...>();
+            sql += ") VALUES (";
+            for (auto i = 0; i < sizeof...(U); ++i) {
+                sql += "?, ";
+            }
+            if constexpr (sizeof...(U) > 0) {
+                sql.pop_back(); // 去掉最後一個空格
+                sql.pop_back(); // 去掉最後一個逗號
+            }
+            sql += ") ON CONFLICT DO UPDATE SET ";
+            sql += GetUpdateField<U...>();
+            sql += ";";
+
+            _sqlite.Execute(sql, values... , values...);
+        }
+
         template<ColumnOrTableColumnConcept... U>
         auto Update(ExprResultValueType<U>... values) {
+            //TODO 重啟檢查
+
             // static_assert(IsTypeGroupSubset<TypeGroup<U...>, columns>(),
             //               "Update values must be subset of table columns");
             return UpdateStatement<nullptr_t, U...>(nullptr, *this, values...);
