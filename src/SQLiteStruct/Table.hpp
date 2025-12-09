@@ -2,7 +2,6 @@
 #include "TableConstraint.hpp"
 
 namespace TypeSQLite {
-
     template<ColumnOrTableColumnConcept T, ColumnOrTableColumnConcept... Ts>
     std::string GetUpdateField() {
         if constexpr (sizeof...(Ts) == 0) {
@@ -84,8 +83,8 @@ namespace TypeSQLite {
     private:
         SQLiteWrapper &_sqlite;
 
-        template<typename _Where, ColumnOrTableColumnConcept... Ts>
-        class UpdateStatement {
+        template<typename _Where, bool AllowEmptyWhere, ColumnOrTableColumnConcept... Ts>
+        class [[nodiscard("You must call Execute() for the query to run.")]] UpdateStatement {
             const Table &_table;
             std::tuple<ExprResultValueType<Ts>...> datas;
             _Where _where;
@@ -99,11 +98,19 @@ namespace TypeSQLite {
             template<ExprConcept Expr>
             auto Where(const Expr &expr) {
                 return std::apply([&](auto &&... params) {
-                    return UpdateStatement<Expr, Ts...>(expr, _table, params...);
+                    return UpdateStatement<Expr, AllowEmptyWhere, Ts...>(expr, _table, params...);
+                }, datas);
+            }
+
+            auto WhereAll() {
+                return std::apply([&](auto &&... params) {
+                    return UpdateStatement<_Where, true, Ts...>(_where, _table, params...);
                 }, datas);
             }
 
             void Execute() {
+                static_assert(!std::is_same_v<_Where, nullptr_t> || AllowEmptyWhere,
+                              "Where clause is required for UpdateStatement.Execute()");
                 auto sql = std::string("UPDATE ") + std::string(name) + " SET " + GetUpdateField<Ts
                                ...>();
                 if constexpr (!std::is_null_pointer_v<_Where>) {
@@ -123,8 +130,8 @@ namespace TypeSQLite {
             }
         };
 
-        template<typename _Where>
-        class DeleteStatement {
+        template<typename _Where, bool AllowEmptyWhere>
+        class [[nodiscard("You must call Execute() for the query to run.")]] DeleteStatement {
             const Table &_table;
             _Where _where;
 
@@ -134,10 +141,16 @@ namespace TypeSQLite {
 
             template<ExprConcept Expr>
             auto Where(const Expr &expr) {
-                return DeleteStatement<Expr>(expr, _table);
+                return DeleteStatement<Expr, AllowEmptyWhere>(expr, _table);
+            }
+
+            auto WhereAll() {
+                return DeleteStatement<_Where, true>(_where, _table);
             }
 
             void Execute() {
+                static_assert(!std::is_same_v<_Where, nullptr_t> || AllowEmptyWhere,
+                              "Where clause is required for DeleteStatement.Execute()");
                 auto sql = std::string("DELETE FROM ") + std::string(name);
                 if constexpr (!std::is_null_pointer_v<_Where>) {
                     sql += " WHERE " + _where.sql;
@@ -206,15 +219,14 @@ namespace TypeSQLite {
 
             // static_assert(IsTypeGroupSubset<TypeGroup<U...>, columns>(),
             //               "Insert values must be subset of table columns");
+            if (sizeof...(U) == 0) {
+                throw std::runtime_error("Insert values cannot be empty");
+            }
             std::string sql = std::string("INSERT INTO ") + std::string(name) + " (";
             sql += GetColumnNamesWithOutTableName<U...>();
-            sql += ") VALUES (";
-            for (auto i = 0; i < sizeof...(U); ++i) {
-                sql += "?, ";
-            }
-            if constexpr (sizeof...(U) > 0) {
-                sql.pop_back(); // 去掉最後一個空格
-                sql.pop_back(); // 去掉最後一個逗號
+            sql += ") VALUES (?";
+            for (auto i = 0; i < sizeof...(U) - 1; ++i) {
+                sql += ",?";
             }
             sql += ");";
 
@@ -228,6 +240,9 @@ namespace TypeSQLite {
 
             // static_assert(IsTypeGroupSubset<TypeGroup<U...>, columns>(),
             //               "Insert values must be subset of table columns");
+            if (sizeof...(U) == 0) {
+                throw std::runtime_error("Insert values cannot be empty");
+            }
             if (rows.empty()) {
                 return;
             }
@@ -238,12 +253,10 @@ namespace TypeSQLite {
             // 準備 SQL 語句
             std::string sql = std::string("INSERT INTO ") + std::string(name) + " (";
             sql += GetColumnNamesWithOutTableName<U...>();
-            sql += ") VALUES (";
-            for (size_t j = 0; j < sizeof...(U); ++j) {
-                sql += "?, ";
+            sql += ") VALUES (?";
+            for (auto i = 0; i < sizeof...(U) - 1; ++i) {
+                sql += ",?";
             }
-            sql.pop_back(); // 去掉最後一個空格
-            sql.pop_back(); // 去掉最後一個逗號
             sql += ");";
 
             // 對每一行執行插入
@@ -262,21 +275,20 @@ namespace TypeSQLite {
 
             // static_assert(IsTypeGroupSubset<TypeGroup<U...>, columns>(),
             //               "Upsert values must be subset of table columns");
+            if (sizeof...(U) == 0) {
+                throw std::runtime_error("Upsert values cannot be empty");
+            }
             std::string sql = std::string("INSERT INTO ") + std::string(name) + " (";
             sql += GetColumnNamesWithOutTableName<U...>();
-            sql += ") VALUES (";
-            for (auto i = 0; i < sizeof...(U); ++i) {
-                sql += "?, ";
-            }
-            if constexpr (sizeof...(U) > 0) {
-                sql.pop_back(); // 去掉最後一個空格
-                sql.pop_back(); // 去掉最後一個逗號
+            sql += ") VALUES (?";
+            for (auto i = 0; i < sizeof...(U) - 1; ++i) {
+                sql += ",?";
             }
             sql += ") ON CONFLICT DO UPDATE SET ";
             sql += GetUpdateField<U...>();
             sql += ";";
 
-            _sqlite.Execute(sql, values... , values...);
+            _sqlite.Execute(sql, values..., values...);
         }
 
         template<ColumnOrTableColumnConcept... U>
@@ -285,11 +297,14 @@ namespace TypeSQLite {
 
             // static_assert(IsTypeGroupSubset<TypeGroup<U...>, columns>(),
             //               "Update values must be subset of table columns");
-            return UpdateStatement<nullptr_t, U...>(nullptr, *this, values...);
+            if (sizeof...(U) == 0) {
+                throw std::runtime_error("Update values cannot be empty");
+            }
+            return UpdateStatement<nullptr_t, false, U...>(nullptr, *this, values...);
         }
 
         auto Delete() {
-            return DeleteStatement<nullptr_t>(nullptr, *this);
+            return DeleteStatement<nullptr_t, false>(nullptr, *this);
         }
 
         template<typename Column>

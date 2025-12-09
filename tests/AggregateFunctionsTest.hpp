@@ -227,7 +227,7 @@ TEST_F(AggregateFunctionTest, MinMaxCombination) {
 
 // 測試空表的聚合函數
 TEST_F(AggregateFunctionTest, AggregateFunctionOnEmptyTable) {
-    userTable.Delete().Execute();
+    userTable.Delete().WhereAll().Execute();
 
     auto results = userTable.Select(
         Count(userTable[NameColumn])
@@ -429,7 +429,7 @@ TEST_F(AggregateFunctionTest, TotalWithGroupBy) {
 
 // 測試空表的 GROUP BY
 TEST_F(AggregateFunctionTest, GroupByOnEmptyTable) {
-    userTable.Delete().Execute();
+    userTable.Delete().WhereAll().Execute();
 
     auto results = userTable.Select(
         userTable[AgeColumn],

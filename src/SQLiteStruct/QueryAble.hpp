@@ -36,7 +36,7 @@ namespace TypeSQLite {
         const Source _source;
 
         template<typename _Where, typename _GroupBy, typename _OrderExpr, typename... ResultColumns>
-        class SelectStatement {
+        class [[nodiscard("You must call Result() for the query to run.")]] SelectStatement {
             const SQLiteWrapper &_sqlite;
             const Source &_source;
             _Where _where;

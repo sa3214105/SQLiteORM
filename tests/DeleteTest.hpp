@@ -43,7 +43,7 @@ TEST_F(DeleteTest, DeleteAllRows) {
     userTable.Insert<decltype(NameColumn)>("Alice");
     userTable.Insert<decltype(NameColumn)>("Bob");
 
-    userTable.Delete().Execute();
+    userTable.Delete().WhereAll().Execute();
 
     auto results = userTable.Select(userTable[NameColumn]).Results().ToVector();
     EXPECT_EQ(results.size(), 0);
