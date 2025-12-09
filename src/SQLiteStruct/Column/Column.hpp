@@ -1,7 +1,7 @@
 #pragma once
-#include "ColumnConstraints.hpp"
-#include "../TemplateHelper/FixedString.hpp"
-#include "Expr.hpp"
+#include "../Column/ColumnConstraints.hpp"
+#include "../../TemplateHelper/FixedString.hpp"
+#include "../Expressions/Expressions.hpp"
 
 namespace TypeSQLite {
     template<ExprResultType type>

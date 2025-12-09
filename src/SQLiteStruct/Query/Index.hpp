@@ -1,6 +1,6 @@
 #pragma once
 #include "Table.hpp"
-#include "../SQLiteWrapper.hpp"
+#include "../../SQLiteWrapper.hpp"
 
 namespace TypeSQLite {
     //TODO 改成ColumnWithOrder

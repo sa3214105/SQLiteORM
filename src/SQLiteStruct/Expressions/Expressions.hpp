@@ -16,7 +16,7 @@ namespace TypeSQLite {
     };
 
     template<ExprResultType exprResultType, typename Columns, typename Parameters>
-    struct Expr {
+    struct Expressions {
         constexpr static ExprResultType resultType = exprResultType;
         const Columns cols;
         const std::string sql;
@@ -27,7 +27,7 @@ namespace TypeSQLite {
     struct IsExprBase {
     private:
         template<ExprResultType exprResultType, typename Columns, typename Parameters>
-        static std::true_type test(const Expr<exprResultType, Columns, Parameters> *) { return {}; }
+        static std::true_type test(const Expressions<exprResultType, Columns, Parameters> *) { return {}; }
 
         static std::false_type test(...) { return {}; }
 
@@ -53,7 +53,7 @@ namespace TypeSQLite {
 
     // sqlite literal
     inline auto operator""_expr(const char *str, size_t) {
-        return Expr<ExprResultType::TEXT, std::tuple<>, std::tuple<std::string> >{
+        return Expressions<ExprResultType::TEXT, std::tuple<>, std::tuple<std::string> >{
             .cols = std::tuple<>{},
             .sql = "?",
             .params = std::make_tuple(std::string(str))
@@ -61,7 +61,7 @@ namespace TypeSQLite {
     }
 
     inline auto operator""_expr(const long double value) {
-        return Expr<ExprResultType::NUMERIC, std::tuple<>, std::tuple<double> >{
+        return Expressions<ExprResultType::NUMERIC, std::tuple<>, std::tuple<double> >{
             .cols = std::tuple<>{},
             .sql = "?",
             .params = std::make_tuple(static_cast<double>(value))
@@ -69,7 +69,7 @@ namespace TypeSQLite {
     }
 
     inline auto operator""_expr(const unsigned long long value) {
-        return Expr<ExprResultType::NUMERIC, std::tuple<>, std::tuple<double> >{
+        return Expressions<ExprResultType::NUMERIC, std::tuple<>, std::tuple<double> >{
             .cols = std::tuple<>{},
             .sql = "?",
             .params = std::make_tuple(static_cast<double>(value))
@@ -79,7 +79,7 @@ namespace TypeSQLite {
     // sqlite one operand operators
     template<ExprConcept T>
     auto MakeExprWithOneOperands(const std::string &newSQL, const T expr) {
-        return Expr<ExprResultType::NUMERIC, decltype(expr.cols), decltype(expr.params)>{
+        return Expressions<ExprResultType::NUMERIC, decltype(expr.cols), decltype(expr.params)>{
             .cols = expr.cols,
             .sql = newSQL,
             .params = expr.params
@@ -116,7 +116,7 @@ namespace TypeSQLite {
     auto MakeExprWithTwoOperands(std::string newSQL,const lhs &left, const rhs &right) {
         auto newCols = std::tuple_cat(left.cols, right.cols);
         auto newPara = std::tuple_cat(left.params, right.params);
-        return Expr<ExprResultType::NUMERIC, decltype(newCols), decltype(newPara)>{
+        return Expressions<ExprResultType::NUMERIC, decltype(newCols), decltype(newPara)>{
             .cols = newCols,
             .sql = newSQL,
             .params = newPara
@@ -251,7 +251,7 @@ namespace TypeSQLite {
         constexpr auto newSQL = left.sql + " BETWEEN " + mid.sql + " AND " + right.sql;
         auto newCols = std::tuple_cat(left.cols, mid.cols, right.cols);
         auto newPara = std::tuple_cat(left.params, mid.params, right.params);
-        return Expr<ExprResultType::NUMERIC, decltype(newCols), decltype(newPara)>{
+        return Expressions<ExprResultType::NUMERIC, decltype(newCols), decltype(newPara)>{
             .cols = newCols,
             .sql = newSQL,
             .params = newPara

@@ -1,6 +1,6 @@
 #pragma once
-#include "../TemplateHelper/FixedString.hpp"
-#include "Expr.hpp"
+#include "../../TemplateHelper/FixedString.hpp"
+#include "./Expressions.hpp"
 
 namespace TypeSQLite {
     // AVG - Average value

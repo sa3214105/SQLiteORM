@@ -1,6 +1,6 @@
 #pragma once
-#include "Table.hpp"
-#include "Index.hpp"
+#include "Query/Table.hpp"
+#include "Query/Index.hpp"
 #include "../TemplateHelper/FixedString.hpp"
 #include "../SQLiteWrapper.hpp"
 

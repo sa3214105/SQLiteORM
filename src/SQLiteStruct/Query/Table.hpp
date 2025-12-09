@@ -72,7 +72,7 @@ namespace TypeSQLite {
     concept TableDefinitionConcept = IsTableDefinition<T>::value;
 
     template<typename TableDef>
-    class Table final : public QueryAble<decltype(std::declval<TableDef>().columns), SourceInfo<Table<TableDef> > > {
+    class Table final : public SelectAble<decltype(std::declval<TableDef>().columns), SourceInfo<Table<TableDef> > > {
     public:
         template<ColumnConcept Col>
         using TableColumn = TableColumn_Base<Table, Col>;
@@ -170,7 +170,7 @@ namespace TypeSQLite {
         };
 
     public:
-        explicit Table(SQLiteWrapper &sqlite, TableDef table_def) : QueryAble<decltype(table_def.columns), SourceInfo<
+        explicit Table(SQLiteWrapper &sqlite, TableDef table_def) : SelectAble<decltype(table_def.columns), SourceInfo<
                                                                         Table> >(sqlite, table_def.columns,
                                                                         SourceInfo<Table>()), _tableDef(table_def),
                                                                     columns(table_def.columns),

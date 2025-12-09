@@ -1,8 +1,8 @@
 #pragma once
-#include "Order.hpp"
-#include "ConflictCause.hpp"
-#include "../TemplateHelper/FixedType.hpp"
-#include "../TemplateHelper/TypeGroup.hpp"
+#include "../Order.hpp"
+#include "../Column/ConflictCause.hpp"
+#include "../../TemplateHelper/FixedType.hpp"
+#include "../../TemplateHelper/TypeGroup.hpp"
 
 namespace TypeSQLite {
     template<OrderType order = OrderType::ASC, ConflictCause conflictCause = ConflictCause::ABORT>

@@ -1,33 +1,32 @@
 #pragma once
 #include <cmath>
 
-#include "../SQLiteWrapper.hpp"
-#include "DataSource.h"
-#include "Column.hpp"
-#include "Expr.hpp"
-#include "AggregateFunctions.hpp"
+#include "../../SQLiteWrapper.hpp"
+#include "../Query/DataSource.hpp"
+#include "../Column/Column.hpp"
+#include "../Expressions/Expressions.hpp"
 
 namespace TypeSQLite {
     template<typename Cols, SourceInfoConcept Src>
-    class QueryAble;
+    class SelectAble;
 
     template<typename>
     struct IsQueryAble : std::false_type {
     };
 
     template<ColumnOrTableColumnGroupConcept Columns, SourceInfoConcept Src>
-    struct IsQueryAble<QueryAble<Columns, Src> > : std::true_type {
+    struct IsQueryAble<SelectAble<Columns, Src> > : std::true_type {
     };
 
     template<typename T>
     concept ConvertToQueryAbleConcept = requires(T *p)
     {
-        []<typename... Args>(const QueryAble<Args...> *) {
+        []<typename... Args>(const SelectAble<Args...> *) {
         }(p);
     } || IsQueryAble<T>::value;
 
     template<typename Cols, SourceInfoConcept Source>
-    class QueryAble {
+    class SelectAble {
     public:
         const Cols columns;
 
@@ -174,11 +173,11 @@ namespace TypeSQLite {
         };
 
     public:
-        explicit QueryAble(SQLiteWrapper &sqlite, Cols columns, Source source) : columns(columns), _sqlite(sqlite),
+        explicit SelectAble(SQLiteWrapper &sqlite, Cols columns, Source source) : columns(columns), _sqlite(sqlite),
             _source(source) {
         }
 
-        virtual ~QueryAble() = default;
+        virtual ~SelectAble() = default;
 
         template<typename... ResultCol>
         auto Select(ResultCol... resultCols) const {
@@ -199,7 +198,7 @@ namespace TypeSQLite {
             auto newColumns = std::tuple_cat(columns, table2.columns);
             using NewCols = decltype(newColumns);
             using NewSource = decltype(newSource);
-            return QueryAble<NewCols, NewSource>(this->_sqlite, newColumns, newSource);
+            return SelectAble<NewCols, NewSource>(this->_sqlite, newColumns, newSource);
         }
 
         template<ConvertToQueryAbleConcept Table2, ExprConcept Expr>
@@ -211,7 +210,7 @@ namespace TypeSQLite {
             auto newColumns = std::tuple_cat(columns, table2.columns);
             using NewCols = decltype(newColumns);
             using NewSource = decltype(newSource);
-            return QueryAble<NewCols, NewSource>(this->_sqlite, newColumns, newSource);
+            return SelectAble<NewCols, NewSource>(this->_sqlite, newColumns, newSource);
         }
 
         template<ConvertToQueryAbleConcept Table2, ExprConcept Expr>
@@ -223,7 +222,7 @@ namespace TypeSQLite {
             auto newColumns = std::tuple_cat(columns, table2.columns);
             using NewCols = decltype(newColumns);
             using NewSource = decltype(newSource);
-            return QueryAble<NewCols, NewSource>(this->_sqlite, newColumns, newSource);
+            return SelectAble<NewCols, NewSource>(this->_sqlite, newColumns, newSource);
         }
 
         template<ConvertToQueryAbleConcept Table2, ExprConcept Expr>
@@ -235,7 +234,7 @@ namespace TypeSQLite {
             auto newColumns = std::tuple_cat(columns, table2.columns);
             using NewCols = decltype(newColumns);
             using NewSource = decltype(newSource);
-            return QueryAble<NewCols, NewSource>(this->_sqlite, newColumns, newSource);
+            return SelectAble<NewCols, NewSource>(this->_sqlite, newColumns, newSource);
         }
 
         template<ConvertToQueryAbleConcept Table2, ExprConcept Expr>
@@ -247,7 +246,7 @@ namespace TypeSQLite {
             auto newColumns = std::tuple_cat(columns, table2.columns);
             using NewCols = decltype(newColumns);
             using NewSource = decltype(newSource);
-            return QueryAble<NewCols, NewSource>(this->_sqlite, newColumns, newSource);
+            return SelectAble<NewCols, NewSource>(this->_sqlite, newColumns, newSource);
         }
     };
 }

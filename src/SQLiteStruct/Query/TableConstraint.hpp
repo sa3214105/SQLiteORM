@@ -1,6 +1,6 @@
 #pragma once
-#include "Column.hpp"
-#include "../TemplateHelper/FixedString.hpp"
+#include "../Column/Column.hpp"
+#include "../../TemplateHelper/FixedString.hpp"
 
 namespace TypeSQLite {
     // Helper structure to pair a column with its order
