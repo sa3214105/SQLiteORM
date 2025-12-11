@@ -9,6 +9,7 @@
 #include "SQLiteStruct/Query/Index.hpp"
 #include "SQLiteStruct/Expressions/Expressions.hpp"
 #include "SQLiteStruct/Expressions/AggregateFunctions.hpp"
+#include "SQLiteStruct/Expressions/WindowFunctions.hpp"
 #include "SQliteStruct/Database.hpp"
 #include "SQLiteStruct/Order.hpp"
 #include "SQLiteWrapper.hpp"

@@ -12,7 +12,7 @@ protected:
 
 // 測試基本 Upsert (INSERT 行為)
 TEST_F(UpsertTest, UpsertInsertNewRow) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER>;
+    using IdColumn = Column<"id", DataType::INTEGER>;
     auto testTableDef = MakeTableDefinition<"test_upsert_insert">(
         std::make_tuple(IdColumn{}, NameColumn, AgeColumn),
         std::make_tuple(TablePrimaryKey(std::make_tuple(IdColumn{}))),
@@ -38,7 +38,7 @@ TEST_F(UpsertTest, UpsertInsertNewRow) {
 
 // 測試 Upsert (UPDATE 行為)
 TEST_F(UpsertTest, UpsertUpdateExistingRow) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER>;
+    using IdColumn = Column<"id", DataType::INTEGER>;
     auto testTableDef = MakeTableDefinition<"test_upsert_update">(
         std::make_tuple(IdColumn{}, NameColumn, AgeColumn),
         std::make_tuple(TablePrimaryKey(std::make_tuple(IdColumn{}))),
@@ -68,7 +68,7 @@ TEST_F(UpsertTest, UpsertUpdateExistingRow) {
 
 // 測試 Upsert 單一欄位
 TEST_F(UpsertTest, UpsertSingleColumn) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER>;
+    using IdColumn = Column<"id", DataType::INTEGER>;
     auto testTableDef = MakeTableDefinition<"test_upsert_single">(
         std::make_tuple(IdColumn{}, NameColumn),
         std::make_tuple(TablePrimaryKey(std::make_tuple(IdColumn{}))),
@@ -92,7 +92,7 @@ TEST_F(UpsertTest, UpsertSingleColumn) {
 
 // 測試 Upsert 多次操作
 TEST_F(UpsertTest, UpsertMultipleTimes) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER>;
+    using IdColumn = Column<"id", DataType::INTEGER>;
     auto testTableDef = MakeTableDefinition<"test_upsert_multiple">(
         std::make_tuple(IdColumn{}, NameColumn, ScoreColumn),
         std::make_tuple(TablePrimaryKey(std::make_tuple(IdColumn{}))),
@@ -124,7 +124,7 @@ TEST_F(UpsertTest, UpsertMultipleTimes) {
 
 // 測試 Upsert 複合主鍵
 TEST_F(UpsertTest, UpsertWithCompositePrimaryKey) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER>;
+    using IdColumn = Column<"id", DataType::INTEGER>;
     auto testTableDef = MakeTableDefinition<"test_upsert_composite">(
         std::make_tuple(IdColumn{}, NameColumn, AgeColumn),
         std::make_tuple(TablePrimaryKey(std::make_tuple(IdColumn{}, NameColumn))),
@@ -167,8 +167,8 @@ TEST_F(UpsertTest, UpsertWithCompositePrimaryKey) {
 
 // 測試 Upsert 與 UNIQUE 約束
 TEST_F(UpsertTest, UpsertWithUniqueConstraint) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER>;
-    using EmailColumn = Column<"email", ExprResultType::TEXT>;
+    using IdColumn = Column<"id", DataType::INTEGER>;
+    using EmailColumn = Column<"email", DataType::TEXT>;
     auto testTableDef = MakeTableDefinition<"test_upsert_unique">(
         std::make_tuple(IdColumn{}, NameColumn, EmailColumn{}),
         std::make_tuple(
@@ -200,7 +200,7 @@ TEST_F(UpsertTest, UpsertWithUniqueConstraint) {
 
 // 測試 Upsert 混合 INSERT 和 UPDATE
 TEST_F(UpsertTest, UpsertMixedInsertAndUpdate) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER>;
+    using IdColumn = Column<"id", DataType::INTEGER>;
     auto testTableDef = MakeTableDefinition<"test_upsert_mixed">(
         std::make_tuple(IdColumn{}, NameColumn, AgeColumn),
         std::make_tuple(TablePrimaryKey(std::make_tuple(IdColumn{}))),

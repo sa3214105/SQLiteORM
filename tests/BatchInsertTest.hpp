@@ -12,7 +12,7 @@ protected:
 
 // 測試基本批量插入
 TEST_F(BatchInsertTest, InsertManyBasic) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER>;
+    using IdColumn = Column<"id", DataType::INTEGER>;
     auto testTableDef = MakeTableDefinition<"test_insert_many">(
         std::make_tuple(IdColumn{}, NameColumn, AgeColumn)
     );
@@ -44,7 +44,7 @@ TEST_F(BatchInsertTest, InsertManyBasic) {
 
 // 測試批量插入空資料
 TEST_F(BatchInsertTest, InsertManyEmpty) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER>;
+    using IdColumn = Column<"id", DataType::INTEGER>;
     auto testTableDef = MakeTableDefinition<"test_insert_many_empty">(
         std::make_tuple(IdColumn{}, NameColumn)
     );
@@ -66,7 +66,7 @@ TEST_F(BatchInsertTest, InsertManyEmpty) {
 
 // 測試批量插入部分欄位
 TEST_F(BatchInsertTest, InsertManyPartialColumns) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER>;
+    using IdColumn = Column<"id", DataType::INTEGER>;
     auto testTableDef = MakeTableDefinition<"test_insert_many_partial">(
         std::make_tuple(IdColumn{}, NameColumn, AgeColumn)
     );
@@ -92,8 +92,8 @@ TEST_F(BatchInsertTest, InsertManyPartialColumns) {
 
 // 測試批量插入違反約束
 TEST_F(BatchInsertTest, InsertManyWithConstraintViolation) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER, ColumnPrimaryKey<>>;
-    using EmailColumn = Column<"email", ExprResultType::TEXT>;
+    using IdColumn = Column<"id", DataType::INTEGER, ColumnPrimaryKey<>>;
+    using EmailColumn = Column<"email", DataType::TEXT>;
     auto testTableDef = MakeTableDefinition<"test_insert_many_constraint">(
         std::make_tuple(IdColumn{}, NameColumn, EmailColumn{})
     );
@@ -125,7 +125,7 @@ TEST_F(BatchInsertTest, InsertManyWithConstraintViolation) {
 
 // 測試批量插入與單筆插入混合使用
 TEST_F(BatchInsertTest, InsertManyMixedWithSingleInsert) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER>;
+    using IdColumn = Column<"id", DataType::INTEGER>;
     auto testTableDef = MakeTableDefinition<"test_insert_many_mixed">(
         std::make_tuple(IdColumn{}, NameColumn)
     );
@@ -158,7 +158,7 @@ TEST_F(BatchInsertTest, InsertManyMixedWithSingleInsert) {
 
 // 測試批量插入效能（大量資料）
 TEST_F(BatchInsertTest, InsertManyPerformance) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER>;
+    using IdColumn = Column<"id", DataType::INTEGER>;
     auto testTableDef = MakeTableDefinition<"test_insert_many_performance">(
         std::make_tuple(IdColumn{}, NameColumn, AgeColumn, ScoreColumn)
     );

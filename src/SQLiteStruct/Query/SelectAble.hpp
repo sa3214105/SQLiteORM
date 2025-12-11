@@ -14,8 +14,8 @@ namespace TypeSQLite {
     struct IsQueryAble : std::false_type {
     };
 
-    template<ColumnOrTableColumnGroupConcept Columns, SourceInfoConcept Src>
-    struct IsQueryAble<SelectAble<Columns, Src> > : std::true_type {
+    template<typename Cols, SourceInfoConcept Src>
+    struct IsQueryAble<SelectAble<Cols, Src> > : std::true_type {
     };
 
     template<typename T>
@@ -50,7 +50,11 @@ namespace TypeSQLite {
             auto GetResultColumnParamTuple() const {
                 return std::apply([&](auto &&... columns) {
                     return std::tuple_cat(([]<typename T>(const T &col) {
-                        return col.params;
+                        if constexpr(ColumnOrTableColumnConcept<T>) {
+                            return std::tuple();
+                        }else {
+                            return col.params;
+                        }
                     }(columns))...);
                 }, _resultColumns);
             }
@@ -67,13 +71,13 @@ namespace TypeSQLite {
                 if constexpr (std::is_null_pointer_v<_GroupBy>) {
                     return std::tuple();
                 } else {
-                    return std::apply([](auto &&... expr) { return GetExprParamTuple(expr...); },
+                    return std::apply([](auto &&... expr) { return GetExprsParamTuple(expr...); },
                                       _groupBy);
                 }
             }
 
             auto GetOrderParamTuple() const {
-                if constexpr (std::is_null_pointer_v<_OrderExpr>) {
+                if constexpr (std::is_null_pointer_v<_OrderExpr> || ColumnOrTableColumnConcept<_OrderExpr>) {
                     return std::tuple();
                 } else {
                     return _orderExpr.params;
@@ -100,7 +104,7 @@ namespace TypeSQLite {
                                                              _isDistinct(isDistinct) {
             }
 
-            template<ExprConcept Expr>
+            template<ExprOrColConcept Expr>
             auto Where(const Expr &expr) {
                 return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
                     return SelectStatement<Expr, _GroupBy, _OrderExpr, ResultColumns...>(
@@ -119,7 +123,7 @@ namespace TypeSQLite {
                 return *this;
             }
 
-            template<ExprConcept... Exprs>
+            template<ExprOrColConcept... Exprs>
             auto GroupBy(Exprs... exprs) {
                 return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
                     return SelectStatement<_Where, std::tuple<Exprs...>, _OrderExpr, ResultColumns...>(
@@ -129,7 +133,7 @@ namespace TypeSQLite {
                 }(std::index_sequence_for<ResultColumns...>{});
             }
 
-            template<ExprConcept Expr>
+            template<ExprOrColConcept Expr>
             auto OrderBy(Expr expr, OrderType order = OrderType::ASC) {
                 return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
                     return SelectStatement<_Where, _GroupBy, Expr, ResultColumns...>(
@@ -189,7 +193,7 @@ namespace TypeSQLite {
                 resultCols...);
         }
 
-        template<ConvertToQueryAbleConcept Table2, ExprConcept Expr>
+        template<ConvertToQueryAbleConcept Table2, ExprOrColConcept Expr>
         auto FullJoin(const Table2 &table2, const Expr &expr) const {
             auto newSource = JoinSource(this->_source, DataSource<Table2, Expr>{
                                             .type = JoinType::FULL,
@@ -201,7 +205,7 @@ namespace TypeSQLite {
             return SelectAble<NewCols, NewSource>(this->_sqlite, newColumns, newSource);
         }
 
-        template<ConvertToQueryAbleConcept Table2, ExprConcept Expr>
+        template<ConvertToQueryAbleConcept Table2, ExprOrColConcept Expr>
         auto InnerJoin(const Table2 &table2, const Expr &expr) const {
             auto newSource = JoinSource(this->_source, DataSource<Table2, Expr>{
                                             .type = JoinType::INNER,
@@ -213,7 +217,7 @@ namespace TypeSQLite {
             return SelectAble<NewCols, NewSource>(this->_sqlite, newColumns, newSource);
         }
 
-        template<ConvertToQueryAbleConcept Table2, ExprConcept Expr>
+        template<ConvertToQueryAbleConcept Table2, ExprOrColConcept Expr>
         auto LeftJoin(const Table2 &table2, const Expr &expr) const {
             auto newSource = JoinSource(this->_source, DataSource<Table2, Expr>{
                                             .type = JoinType::LEFT,
@@ -225,7 +229,7 @@ namespace TypeSQLite {
             return SelectAble<NewCols, NewSource>(this->_sqlite, newColumns, newSource);
         }
 
-        template<ConvertToQueryAbleConcept Table2, ExprConcept Expr>
+        template<ConvertToQueryAbleConcept Table2, ExprOrColConcept Expr>
         auto RightJoin(const Table2 &table2, const Expr &expr) const {
             auto newSource = JoinSource(this->_source, DataSource<Table2, Expr>{
                                             .type = JoinType::RIGHT,
@@ -237,7 +241,7 @@ namespace TypeSQLite {
             return SelectAble<NewCols, NewSource>(this->_sqlite, newColumns, newSource);
         }
 
-        template<ConvertToQueryAbleConcept Table2, ExprConcept Expr>
+        template<ConvertToQueryAbleConcept Table2, ExprOrColConcept Expr>
         auto CrossJoin(const Table2 &table2, const Expr &expr) const {
             auto newSource = JoinSource(this->_source, DataSource<Table2, Expr>{
                                             .type = JoinType::CROSS,

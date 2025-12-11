@@ -95,7 +95,7 @@ namespace TypeSQLite {
                 _where(where) {
             }
 
-            template<ExprConcept Expr>
+            template<ExprOrColConcept Expr>
             auto Where(const Expr &expr) {
                 return std::apply([&](auto &&... params) {
                     return UpdateStatement<Expr, AllowEmptyWhere, Ts...>(expr, _table, params...);
@@ -139,7 +139,7 @@ namespace TypeSQLite {
             explicit DeleteStatement(_Where where, const Table &table) : _table(table), _where(where) {
             }
 
-            template<ExprConcept Expr>
+            template<ExprOrColConcept Expr>
             auto Where(const Expr &expr) {
                 return DeleteStatement<Expr, AllowEmptyWhere>(expr, _table);
             }

@@ -12,7 +12,7 @@ protected:
 
 // 測試 WITHOUT ROWID 選項
 TEST_F(TableOptionTest, TableOptionWithoutRowId) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER>;
+    using IdColumn = Column<"id", DataType::INTEGER>;
     auto testTableDef = MakeTableDefinition<"test_without_rowid">(
         std::make_tuple(IdColumn{}, NameColumn),
         std::make_tuple(TablePrimaryKey(std::make_tuple(IdColumn{}))),
@@ -34,7 +34,7 @@ TEST_F(TableOptionTest, TableOptionWithoutRowId) {
 
 // 測試 STRICT 選項
 TEST_F(TableOptionTest, TableOptionStrict) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER>;
+    using IdColumn = Column<"id", DataType::INTEGER>;
     auto testTableDef = MakeTableDefinition<"test_strict">(
         std::make_tuple(IdColumn{}, NameColumn, AgeColumn),
         std::make_tuple(Strict{}),
@@ -59,8 +59,8 @@ TEST_F(TableOptionTest, TableOptionStrict) {
 
 // 測試 WITHOUT ROWID 與 STRICT 組合
 TEST_F(TableOptionTest, TableOptionWithoutRowIdAndStrict) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER>;
-    using EmailColumn = Column<"email", ExprResultType::TEXT>;
+    using IdColumn = Column<"id", DataType::INTEGER>;
+    using EmailColumn = Column<"email", DataType::TEXT>;
     auto testTableDef = MakeTableDefinition<"test_without_rowid_strict">(
         std::make_tuple(IdColumn{}, NameColumn, EmailColumn{}),
         std::make_tuple(TablePrimaryKey(std::make_tuple(IdColumn{}))),
@@ -83,8 +83,8 @@ TEST_F(TableOptionTest, TableOptionWithoutRowIdAndStrict) {
 
 // 測試帶有複合主鍵的 WITHOUT ROWID
 TEST_F(TableOptionTest, TableOptionWithoutRowIdCompositeKey) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER>;
-    using CategoryColumn = Column<"category", ExprResultType::TEXT>;
+    using IdColumn = Column<"id", DataType::INTEGER>;
+    using CategoryColumn = Column<"category", DataType::TEXT>;
     auto testTableDef = MakeTableDefinition<"test_without_rowid_composite">(
         std::make_tuple(IdColumn{}, CategoryColumn{}, NameColumn),
         std::make_tuple(TablePrimaryKey(std::make_tuple(CategoryColumn{}, IdColumn{}))),
@@ -112,9 +112,9 @@ TEST_F(TableOptionTest, TableOptionWithoutRowIdCompositeKey) {
 
 // 測試 STRICT 與多個約束組合
 TEST_F(TableOptionTest, TableOptionStrictWithConstraints) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER>;
-    using EmailColumn = Column<"email", ExprResultType::TEXT>;
-    using PhoneColumn = Column<"phone", ExprResultType::TEXT>;
+    using IdColumn = Column<"id", DataType::INTEGER>;
+    using EmailColumn = Column<"email", DataType::TEXT>;
+    using PhoneColumn = Column<"phone", DataType::TEXT>;
     auto testTableDef = MakeTableDefinition<"test_strict_constraints">(
         std::make_tuple(IdColumn{}, NameColumn, EmailColumn{}, PhoneColumn{}),
         std::make_tuple(TablePrimaryKey(std::make_tuple(IdColumn{})),

@@ -12,7 +12,7 @@ protected:
 
 // 測試 PrimaryKey (單欄位主鍵)
 TEST_F(TableConstraintTest, TableConstraintPrimaryKeySingle) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER>;
+    using IdColumn = Column<"id", DataType::INTEGER>;
     auto testTableDef = MakeTableDefinition<"test_pk_single">(
         std::make_tuple(IdColumn{}, NameColumn),
         std::make_tuple(TablePrimaryKey(std::make_tuple(IdColumn{}))),
@@ -37,7 +37,7 @@ TEST_F(TableConstraintTest, TableConstraintPrimaryKeySingle) {
 
 // 測試 PrimaryKey (複合主鍵)
 TEST_F(TableConstraintTest, TableConstraintPrimaryKeyComposite) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER>;
+    using IdColumn = Column<"id", DataType::INTEGER>;
     auto testTableDef = MakeTableDefinition<"test_pk_composite">(
         std::make_tuple(IdColumn{}, NameColumn, AgeColumn),
         std::make_tuple(TablePrimaryKey(std::make_tuple(IdColumn{}, NameColumn))),
@@ -65,7 +65,7 @@ TEST_F(TableConstraintTest, TableConstraintPrimaryKeyComposite) {
 
 // 測試 Unique (單欄位唯一約束)
 TEST_F(TableConstraintTest, TableConstraintUniqueSingle) {
-    using EmailColumn = Column<"email", ExprResultType::TEXT>;
+    using EmailColumn = Column<"email", DataType::TEXT>;
     auto testTableDef = MakeTableDefinition<"test_unique_single">(
         std::make_tuple(NameColumn, EmailColumn{}),
         std::make_tuple(TableUnique(std::make_tuple(EmailColumn{}))),
@@ -89,7 +89,7 @@ TEST_F(TableConstraintTest, TableConstraintUniqueSingle) {
 
 // 測試 Unique (複合唯一約束)
 TEST_F(TableConstraintTest, TableConstraintUniqueComposite) {
-    using EmailColumn = Column<"email", ExprResultType::TEXT>;
+    using EmailColumn = Column<"email", DataType::TEXT>;
     auto testTableDef = MakeTableDefinition<"test_unique_composite">(
         std::make_tuple(NameColumn, EmailColumn{}),
         std::make_tuple(TableUnique(std::make_tuple(NameColumn, EmailColumn{}))),
@@ -115,8 +115,8 @@ TEST_F(TableConstraintTest, TableConstraintUniqueComposite) {
 
 // 測試混合使用欄位約束和表約束
 TEST_F(TableConstraintTest, TableConstraintMixed) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER, ColumnPrimaryKey<>>;
-    using EmailColumn = Column<"email", ExprResultType::TEXT, ColumnNotNull<>>;
+    using IdColumn = Column<"id", DataType::INTEGER, ColumnPrimaryKey<>>;
+    using EmailColumn = Column<"email", DataType::TEXT, ColumnNotNull<>>;
     auto testTableDef = MakeTableDefinition<"test_mixed_constraints">(
         std::make_tuple(IdColumn{}, NameColumn, EmailColumn{}),
         std::make_tuple(TableUnique(std::make_tuple(EmailColumn{}))),
@@ -153,7 +153,7 @@ TEST_F(TableConstraintTest, TableConstraintMixed) {
 
 // 測試 PrimaryKey 與 DESC 排序
 TEST_F(TableConstraintTest, TableConstraintPrimaryKeyDesc) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER>;
+    using IdColumn = Column<"id", DataType::INTEGER>;
     auto testTableDef = MakeTableDefinition<"test_pk_desc_table">(
         std::make_tuple(IdColumn{}, NameColumn),
         std::make_tuple(TablePrimaryKey(std::make_tuple(ColumnWithOrder(IdColumn(), OrderType::DESC)))),
@@ -172,7 +172,7 @@ TEST_F(TableConstraintTest, TableConstraintPrimaryKeyDesc) {
 
 // 測試 Unique 與衝突處理
 TEST_F(TableConstraintTest, TableConstraintUniqueWithConflict) {
-    using EmailColumn = Column<"email", ExprResultType::TEXT>;
+    using EmailColumn = Column<"email", DataType::TEXT>;
     auto testTableDef = MakeTableDefinition<"test_unique_conflict">(
         std::make_tuple(NameColumn, EmailColumn{}),
         std::make_tuple(TableUnique(std::make_tuple(EmailColumn{}), ConflictCause::IGNORE)),
@@ -195,7 +195,7 @@ TEST_F(TableConstraintTest, TableConstraintUniqueWithConflict) {
 
 // 測試 PrimaryKey 複合主鍵每個欄位不同排序
 TEST_F(TableConstraintTest, TableConstraintPrimaryKeyMixedOrder) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER>;
+    using IdColumn = Column<"id", DataType::INTEGER>;
     auto testTableDef = MakeTableDefinition<"test_pk_mixed_order">(
         std::make_tuple(IdColumn{}, NameColumn, AgeColumn),
         std::make_tuple(TablePrimaryKey(std::make_tuple(
@@ -226,8 +226,8 @@ TEST_F(TableConstraintTest, TableConstraintPrimaryKeyMixedOrder) {
 
 // 測試 Unique 複合唯一約束每個欄位不同排序
 TEST_F(TableConstraintTest, TableConstraintUniqueMixedOrder) {
-    using EmailColumn = Column<"email", ExprResultType::TEXT>;
-    using PhoneColumn = Column<"phone", ExprResultType::TEXT>;
+    using EmailColumn = Column<"email", DataType::TEXT>;
+    using PhoneColumn = Column<"phone", DataType::TEXT>;
     auto testTableDef = MakeTableDefinition<"test_unique_mixed_order">(
         std::make_tuple(NameColumn, EmailColumn{}, PhoneColumn{}),
         std::make_tuple(TableUnique(std::make_tuple(
@@ -260,8 +260,8 @@ TEST_F(TableConstraintTest, TableConstraintUniqueMixedOrder) {
 
 // 測試混合使用有序和無序的欄位
 TEST_F(TableConstraintTest, TableConstraintMixedOrderedUnordered) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER>;
-    using EmailColumn = Column<"email", ExprResultType::TEXT>;
+    using IdColumn = Column<"id", DataType::INTEGER>;
+    using EmailColumn = Column<"email", DataType::TEXT>;
     auto testTableDef = MakeTableDefinition<"test_mixed_ordered_unordered">(
         std::make_tuple(IdColumn{}, NameColumn, EmailColumn{}),
         std::make_tuple(TablePrimaryKey(std::make_tuple(
@@ -283,10 +283,10 @@ TEST_F(TableConstraintTest, TableConstraintMixedOrderedUnordered) {
 
 // 測試多個 UNIQUE 約束
 TEST_F(TableConstraintTest, TableConstraintMultipleUnique) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER>;
-    using EmailColumn = Column<"email", ExprResultType::TEXT>;
-    using PhoneColumn = Column<"phone", ExprResultType::TEXT>;
-    using UsernameColumn = Column<"username", ExprResultType::TEXT>;
+    using IdColumn = Column<"id", DataType::INTEGER>;
+    using EmailColumn = Column<"email", DataType::TEXT>;
+    using PhoneColumn = Column<"phone", DataType::TEXT>;
+    using UsernameColumn = Column<"username", DataType::TEXT>;
 
     // 一個表可以有多個 UNIQUE 約束
     auto testTableDef = MakeTableDefinition<"test_multiple_unique">(
@@ -346,10 +346,10 @@ TEST_F(TableConstraintTest, TableConstraintMultipleUnique) {
 
 // 測試複合 UNIQUE 約束組合
 TEST_F(TableConstraintTest, TableConstraintMultipleCompositeUnique) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER>;
-    using FirstNameColumn = Column<"first_name", ExprResultType::TEXT>;
-    using LastNameColumn = Column<"last_name", ExprResultType::TEXT>;
-    using EmailColumn = Column<"email", ExprResultType::TEXT>;
+    using IdColumn = Column<"id", DataType::INTEGER>;
+    using FirstNameColumn = Column<"first_name", DataType::TEXT>;
+    using LastNameColumn = Column<"last_name", DataType::TEXT>;
+    using EmailColumn = Column<"email", DataType::TEXT>;
 
     // 多個複合 UNIQUE 約束
     auto testTableDef = MakeTableDefinition<"test_multiple_composite_unique">(
@@ -398,10 +398,10 @@ TEST_F(TableConstraintTest, TableConstraintMultipleCompositeUnique) {
 
 // 測試 PRIMARY KEY 與多個 UNIQUE 約束組合
 TEST_F(TableConstraintTest, TableConstraintPrimaryKeyWithMultipleUnique) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER>;
-    using EmailColumn = Column<"email", ExprResultType::TEXT>;
-    using PhoneColumn = Column<"phone", ExprResultType::TEXT>;
-    using SsnColumn = Column<"ssn", ExprResultType::TEXT>; // Social Security Number
+    using IdColumn = Column<"id", DataType::INTEGER>;
+    using EmailColumn = Column<"email", DataType::TEXT>;
+    using PhoneColumn = Column<"phone", DataType::TEXT>;
+    using SsnColumn = Column<"ssn", DataType::TEXT>; // Social Security Number
 
     auto testTableDef = MakeTableDefinition<"test_pk_multi_unique">(
         std::make_tuple(IdColumn{}, NameColumn, EmailColumn{}, PhoneColumn{}, SsnColumn{}),
@@ -461,10 +461,10 @@ TEST_F(TableConstraintTest, TableConstraintPrimaryKeyWithMultipleUnique) {
 
 // 測試混合單一和複合 UNIQUE 約束
 TEST_F(TableConstraintTest, TableConstraintMixedSingleCompositeUnique) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER>;
-    using CountryColumn = Column<"country", ExprResultType::TEXT>;
-    using CityColumn = Column<"city", ExprResultType::TEXT>;
-    using EmailColumn = Column<"email", ExprResultType::TEXT>;
+    using IdColumn = Column<"id", DataType::INTEGER>;
+    using CountryColumn = Column<"country", DataType::TEXT>;
+    using CityColumn = Column<"city", DataType::TEXT>;
+    using EmailColumn = Column<"email", DataType::TEXT>;
 
     auto testTableDef = MakeTableDefinition<"test_mixed_unique">(
         std::make_tuple(IdColumn{}, NameColumn, CountryColumn{}, CityColumn{}, EmailColumn{}),

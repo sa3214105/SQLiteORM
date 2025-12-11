@@ -12,7 +12,7 @@ protected:
 
 // 測試 PRIMARY KEY 約束
 TEST_F(ColumnConstraintsTest, ConstraintPrimaryKey) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER, ColumnPrimaryKey<> >;
+    using IdColumn = Column<"id", DataType::INTEGER, ColumnPrimaryKey<> >;
     auto testTableDef = MakeTableDefinition<"test_pk">(std::make_tuple(IdColumn{}, NameColumn));
     Database<decltype(testTableDef)> db("test_database.db", testTableDef);
     auto &testTable = db.GetTable<decltype(testTableDef)>();
@@ -33,7 +33,7 @@ TEST_F(ColumnConstraintsTest, ConstraintPrimaryKey) {
 
 // 測試 PRIMARY KEY 與 DESC 排序
 TEST_F(ColumnConstraintsTest, ConstraintPrimaryKeyDesc) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER, ColumnPrimaryKey<OrderType::DESC> >;
+    using IdColumn = Column<"id", DataType::INTEGER, ColumnPrimaryKey<OrderType::DESC> >;
     auto testTableDef = MakeTableDefinition<"test_pk_desc">(std::make_tuple(IdColumn{}, NameColumn));
     Database<decltype(testTableDef)> db("test_database.db", testTableDef);
     auto &testTable = db.GetTable<decltype(testTableDef)>();
@@ -47,7 +47,7 @@ TEST_F(ColumnConstraintsTest, ConstraintPrimaryKeyDesc) {
 
 // 測試 NOT NULL 約束
 TEST_F(ColumnConstraintsTest, ConstraintNotNull) {
-    using EmailColumn = Column<"email", ExprResultType::TEXT, ColumnNotNull<> >;
+    using EmailColumn = Column<"email", DataType::TEXT, ColumnNotNull<> >;
     auto testTableDef = MakeTableDefinition<"test_not_null">(std::make_tuple(NameColumn, EmailColumn{}));
     Database<decltype(testTableDef)> db("test_database.db", testTableDef);
     auto &testTable = db.GetTable<decltype(testTableDef)>();
@@ -62,7 +62,7 @@ TEST_F(ColumnConstraintsTest, ConstraintNotNull) {
 
 // 測試 UNIQUE 約束
 TEST_F(ColumnConstraintsTest, ConstraintUnique) {
-    using UsernameColumn = Column<"username", ExprResultType::TEXT, ColumnUnique<> >;
+    using UsernameColumn = Column<"username", DataType::TEXT, ColumnUnique<> >;
     auto testTableDef = MakeTableDefinition<"test_unique">(std::make_tuple(UsernameColumn{}, AgeColumn));
     Database<decltype(testTableDef)> db("test_database.db", testTableDef);
     auto &testTable = db.GetTable<decltype(testTableDef)>();
@@ -85,7 +85,7 @@ TEST_F(ColumnConstraintsTest, ConstraintUnique) {
 
 // 測試 DEFAULT 約束（整數）
 TEST_F(ColumnConstraintsTest, ConstraintDefaultInteger) {
-    using StatusColumn = Column<"status", ExprResultType::INTEGER, Default<0> >;
+    using StatusColumn = Column<"status", DataType::INTEGER, Default<0> >;
     auto testTableDef = MakeTableDefinition<"test_default_int">(std::make_tuple(NameColumn, StatusColumn{}));
     Database<decltype(testTableDef)> db("test_database.db", testTableDef);
     auto &testTable = db.GetTable<decltype(testTableDef)>();
@@ -102,7 +102,7 @@ TEST_F(ColumnConstraintsTest, ConstraintDefaultInteger) {
 
 // 測試 DEFAULT 約束（字串）
 TEST_F(ColumnConstraintsTest, ConstraintDefaultString) {
-    using CountryColumn = Column<"country", ExprResultType::TEXT, Default<"Taiwan"> >;
+    using CountryColumn = Column<"country", DataType::TEXT, Default<"Taiwan"> >;
     auto testTableDef = MakeTableDefinition<"test_default_str">(std::make_tuple(NameColumn, CountryColumn{}));
     Database<decltype(testTableDef)> db("test_database.db", testTableDef);
     auto &testTable = db.GetTable<decltype(testTableDef)>();
@@ -119,7 +119,7 @@ TEST_F(ColumnConstraintsTest, ConstraintDefaultString) {
 
 // 測試組合約束：PRIMARY KEY + NOT NULL
 TEST_F(ColumnConstraintsTest, ConstraintCombinationPrimaryKeyNotNull) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER, ColumnPrimaryKey<>, ColumnNotNull<> >;
+    using IdColumn = Column<"id", DataType::INTEGER, ColumnPrimaryKey<>, ColumnNotNull<> >;
     auto testTableDef = MakeTableDefinition<"test_pk_nn">(std::make_tuple(IdColumn{}, NameColumn));
     Database<decltype(testTableDef)> db("test_database.db", testTableDef);
     auto &testTable = db.GetTable<decltype(testTableDef)>();
@@ -138,7 +138,7 @@ TEST_F(ColumnConstraintsTest, ConstraintCombinationPrimaryKeyNotNull) {
 
 // 測試組合約束：UNIQUE + NOT NULL
 TEST_F(ColumnConstraintsTest, ConstraintCombinationUniqueNotNull) {
-    using EmailColumn = Column<"email", ExprResultType::TEXT, ColumnUnique<>, ColumnNotNull<> >;
+    using EmailColumn = Column<"email", DataType::TEXT, ColumnUnique<>, ColumnNotNull<> >;
     auto testTableDef = MakeTableDefinition<"test_uniq_nn">(std::make_tuple(NameColumn, EmailColumn{}));
     Database<decltype(testTableDef)> db("test_database.db", testTableDef);
     auto &testTable = db.GetTable<decltype(testTableDef)>();
@@ -160,7 +160,7 @@ TEST_F(ColumnConstraintsTest, ConstraintCombinationUniqueNotNull) {
 
 // 測試 PRIMARY KEY 與 ON CONFLICT REPLACE
 TEST_F(ColumnConstraintsTest, ConstraintPrimaryKeyConflictReplace) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER, ColumnPrimaryKey<OrderType::ASC, ConflictCause::REPLACE> >;
+    using IdColumn = Column<"id", DataType::INTEGER, ColumnPrimaryKey<OrderType::ASC, ConflictCause::REPLACE> >;
     auto testTableDef = MakeTableDefinition<"test_pk_replace">(std::make_tuple(IdColumn{}, NameColumn));
     Database<decltype(testTableDef)> db("test_database.db", testTableDef);
     auto &testTable = db.GetTable<decltype(testTableDef)>();
@@ -178,7 +178,7 @@ TEST_F(ColumnConstraintsTest, ConstraintPrimaryKeyConflictReplace) {
 
 // 測試 UNIQUE 與 ON CONFLICT IGNORE
 TEST_F(ColumnConstraintsTest, ConstraintUniqueConflictIgnore) {
-    using EmailColumn = Column<"email", ExprResultType::TEXT, ColumnUnique<ConflictCause::IGNORE> >;
+    using EmailColumn = Column<"email", DataType::TEXT, ColumnUnique<ConflictCause::IGNORE> >;
     auto testTableDef = MakeTableDefinition<"test_uniq_ignore">(std::make_tuple(NameColumn, EmailColumn{}));
     Database<decltype(testTableDef)> db("test_database.db", testTableDef);
     auto &testTable = db.GetTable<decltype(testTableDef)>();
@@ -195,7 +195,7 @@ TEST_F(ColumnConstraintsTest, ConstraintUniqueConflictIgnore) {
 
 // 測試 NOT NULL 與 ON CONFLICT FAIL
 TEST_F(ColumnConstraintsTest, ConstraintNotNullConflictFail) {
-    using RequiredColumn = Column<"required_field", ExprResultType::TEXT, ColumnNotNull<ConflictCause::FAIL> >;
+    using RequiredColumn = Column<"required_field", DataType::TEXT, ColumnNotNull<ConflictCause::FAIL> >;
     auto testTableDef = MakeTableDefinition<"test_nn_fail">(std::make_tuple(NameColumn, RequiredColumn{}));
     Database<decltype(testTableDef)> db("test_database.db", testTableDef);
     auto &testTable = db.GetTable<decltype(testTableDef)>();
@@ -209,9 +209,9 @@ TEST_F(ColumnConstraintsTest, ConstraintNotNullConflictFail) {
 
 // 測試複雜的組合約束
 TEST_F(ColumnConstraintsTest, ConstraintComplexCombination) {
-    using IdColumn = Column<"id", ExprResultType::INTEGER, ColumnPrimaryKey<> >;
-    using EmailColumn = Column<"email", ExprResultType::TEXT, ColumnUnique<>, ColumnNotNull<> >;
-    using StatusColumn = Column<"status", ExprResultType::INTEGER, Default<1> >;
+    using IdColumn = Column<"id", DataType::INTEGER, ColumnPrimaryKey<> >;
+    using EmailColumn = Column<"email", DataType::TEXT, ColumnUnique<>, ColumnNotNull<> >;
+    using StatusColumn = Column<"status", DataType::INTEGER, Default<1> >;
     auto testTableDef = MakeTableDefinition<"test_complex">(std::make_tuple(IdColumn{}, NameColumn, EmailColumn{}, StatusColumn{}));
     Database<decltype(testTableDef)> db("test_database.db", testTableDef);
     auto &testTable = db.GetTable<decltype(testTableDef)>();
@@ -251,7 +251,7 @@ TEST_F(ColumnConstraintsTest, ConstraintComplexCombination) {
 
 // 測試實數型的 DEFAULT 約束
 TEST_F(ColumnConstraintsTest, ConstraintDefaultReal) {
-    using RatingColumn = Column<"rating", ExprResultType::REAL, Default<5.0> >;
+    using RatingColumn = Column<"rating", DataType::REAL, Default<5.0> >;
     auto testTableDef = MakeTableDefinition<"test_default_real">(std::make_tuple(NameColumn, RatingColumn{}));
     Database<decltype(testTableDef)> db("test_database.db", testTableDef);
     auto &testTable = db.GetTable<decltype(testTableDef)>();
