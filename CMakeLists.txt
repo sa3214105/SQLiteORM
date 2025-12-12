@@ -27,10 +27,11 @@ if(ENABLE_TESTS AND CMAKE_BUILD_TYPE STREQUAL "Debug")
 
     add_library(sqlite3_static STATIC external/sqlite/sqlite3.c)
     target_include_directories(sqlite3_static PUBLIC `extern/sqlite`)
-    target_compile_definitions(sqlite3_static PRIVATE
+    target_compile_definitions(sqlite3_static PUBLIC
             SQLITE_OMIT_LOAD_EXTENSION=1
             SQLITE_THREADSAFE=2
             SQLITE_ENABLE_MATH_FUNCTIONS
+            SQLITE_SOUNDEX
     )
     if(MSVC)
         target_compile_definitions(sqlite3_static PRIVATE _CRT_SECURE_NO_WARNINGS)

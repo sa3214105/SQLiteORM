@@ -110,12 +110,6 @@ namespace TypeSQLite {
         return MakeExpr<DataType::NUMERIC>("SQRT(" + expr.sql + ")", expr);
     }
 
-    // Rounding and absolute value functions
-    template<ExprOrColConcept T>
-    auto Abs(const T &expr) {
-        return MakeExpr<DataType::NUMERIC>("ABS(" + expr.sql + ")", expr);
-    }
-
     template<ExprOrColConcept T>
     auto Ceil(const T &expr) {
         return MakeExpr<DataType::NUMERIC>("CEIL(" + expr.sql + ")", expr);
@@ -136,15 +130,7 @@ namespace TypeSQLite {
         return MakeExpr<DataType::NUMERIC>("TRUNC(" + expr.sql + ")", expr);
     }
 
-    template<ExprOrColConcept T1, ExprOrColConcept T2>
-    auto Round(const T1 &expr, const T2 &digits) {
-        return MakeExpr<DataType::NUMERIC>("ROUND(" + expr.sql + ", " + digits.sql + ")", expr, digits);
-    }
-
-    template<ExprOrColConcept T>
-    auto Round(const T &expr) {
-        return MakeExpr<DataType::NUMERIC>("ROUND(" + expr.sql + ")", expr);
-    }
+    // Note: ROUND and SIGN moved to ScalarFunctions.hpp
 
     // Other math functions
     template<ExprOrColConcept T>
@@ -157,10 +143,6 @@ namespace TypeSQLite {
         return MakeExpr<DataType::NUMERIC>("RADIANS(" + expr.sql + ")", expr);
     }
 
-    template<ExprOrColConcept T>
-    auto Sign(const T &expr) {
-        return MakeExpr<DataType::NUMERIC>("SIGN(" + expr.sql + ")", expr);
-    }
 
     // Pi constant
     inline auto Pi() {

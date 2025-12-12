@@ -209,16 +209,7 @@ namespace TypeSQLite {
         return MakeExpr<DataType::NUMERIC>(left.sql + " >> " + right.sql, left, right);
     }
 
-    template<ExprOrColConcept lhs, ExprOrColConcept rhs>
-    auto Like(const lhs &left, const rhs &right) {
-        return MakeExpr<DataType::NUMERIC>(left.sql + " LIKE " + right.sql, left, right);
-    }
-
-    template<ExprOrColConcept lhs, ExprOrColConcept rhs>
-    auto Glob(const lhs &left, const rhs &right) {
-        return MakeExpr<DataType::NUMERIC>(left.sql + " GLOB " + right.sql, left, right);
-    }
-
+    // Note: REGEXP and MATCH are pattern matching operators
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto Regexp(const lhs &left, const rhs &right) {
         return MakeExpr<DataType::NUMERIC>(left.sql + " REGEXP " + right.sql, left, right);
@@ -227,16 +218,6 @@ namespace TypeSQLite {
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto Match(const lhs &left, const rhs &right) {
         return MakeExpr<DataType::NUMERIC>(left.sql + " MATCH " + right.sql, left, right);
-    }
-
-    template<ExprOrColConcept lhs, ExprOrColConcept rhs>
-    auto IsNull(const lhs &left, const rhs &right) {
-        return MakeExpr<DataType::NUMERIC>(left.sql + " IS NULL " + right.sql, left, right);
-    }
-
-    template<ExprOrColConcept lhs, ExprOrColConcept rhs>
-    auto IsNotNull(const lhs &left, const rhs &right) {
-        return MakeExpr<DataType::NUMERIC>(left.sql + " IS NOT NULL " + right.sql, left, right);
     }
 
     //TODO 確認In功能
@@ -251,6 +232,24 @@ namespace TypeSQLite {
             .sql = newSQL,
             .params = newPara
         };
+    }
+
+    // CAST - Type conversion
+    template<DataType targetType, ExprOrColConcept T>
+    auto Cast(const T &expr) {
+        std::string typeStr;
+        if constexpr (targetType == DataType::INTEGER) {
+            typeStr = "INTEGER";
+        } else if constexpr (targetType == DataType::REAL) {
+            typeStr = "REAL";
+        } else if constexpr (targetType == DataType::TEXT) {
+            typeStr = "TEXT";
+        } else if constexpr (targetType == DataType::BLOB) {
+            typeStr = "BLOB";
+        } else {
+            typeStr = "NUMERIC";
+        }
+        return MakeExpr<targetType>("CAST(" + expr.sql + " AS " + typeStr + ")", expr);
     }
 
     template<ExprOrColConcept expr, ExprOrColConcept... exprs>
