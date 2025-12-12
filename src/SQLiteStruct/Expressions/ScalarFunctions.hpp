@@ -3,9 +3,6 @@
 
 namespace TypeSQLite {
     // ============ SQLite Core Scalar Functions (Alphabetical Order) ============
-    // Note: MATCH, REGEXP are in Expressions.hpp as pattern matching operators
-    // Note: Date/Time functions (DATE, DATETIME, JULIANDAY, STRFTIME, TIME, UNIXEPOCH) are in DateTimeFunctions.hpp
-    // Note: JSON functions are in JsonFunctions.hpp
 
     // ABS - Absolute value
     template<ExprOrColConcept T>

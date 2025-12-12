@@ -7,6 +7,7 @@
 #include "../Column/Column.hpp"
 #include "../DataType.hpp"
 
+//TODO 由於JsonFunction實作較複雜暫時不實作
 namespace TypeSQLite {
     template<DataType exprResultType, typename Columns, typename Parameters>
     struct Expressions {
