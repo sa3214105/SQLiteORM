@@ -17,6 +17,7 @@
 #include "WindowFunctionTest.hpp"
 #include "MathFunctionsTest.hpp"
 #include "ScalarFunctionsTest.hpp"
+#include "DateTimeFunctionsTest.hpp"
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
