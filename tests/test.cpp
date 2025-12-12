@@ -15,6 +15,7 @@
 #include "ExprTest.hpp"
 #include "IndexTest.hpp"
 #include "WindowFunctionTest.hpp"
+#include "MathFunctionsTest.hpp"
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);

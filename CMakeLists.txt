@@ -30,6 +30,7 @@ if(ENABLE_TESTS AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_definitions(sqlite3_static PRIVATE
             SQLITE_OMIT_LOAD_EXTENSION=1
             SQLITE_THREADSAFE=2
+            SQLITE_ENABLE_MATH_FUNCTIONS
     )
     if(MSVC)
         target_compile_definitions(sqlite3_static PRIVATE _CRT_SECURE_NO_WARNINGS)

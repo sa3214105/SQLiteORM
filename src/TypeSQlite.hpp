@@ -10,6 +10,7 @@
 #include "SQLiteStruct/Expressions/Expressions.hpp"
 #include "SQLiteStruct/Expressions/AggregateFunctions.hpp"
 #include "SQLiteStruct/Expressions/WindowFunctions.hpp"
+#include "SQLiteStruct/Expressions/MathFunctions.hpp"
 #include "SQliteStruct/Database.hpp"
 #include "SQLiteStruct/Order.hpp"
 #include "SQLiteWrapper.hpp"

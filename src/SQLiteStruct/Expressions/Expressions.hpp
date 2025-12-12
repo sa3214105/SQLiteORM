@@ -51,11 +51,11 @@ namespace TypeSQLite {
         }
     }
 
-    template<ExprOrColConcept ...Exps>
+    template<DataType dataType, ExprOrColConcept ...Exps>
     auto MakeExpr(std::string newSQL, Exps... exps) {
         auto newCols = std::tuple_cat(GetCols(exps)...);
         auto newPara = std::tuple_cat(GetParms(exps)...);
-        return Expressions<DataType::NUMERIC, decltype(newCols), decltype(newPara)>{
+        return Expressions<dataType, decltype(newCols), decltype(newPara)>{
             .cols = newCols,
             .sql = newSQL,
             .params = newPara
@@ -96,147 +96,147 @@ namespace TypeSQLite {
 
     template<ExprOrColConcept expr>
     auto operator-(const expr &e) {
-        return MakeExpr("-(" + e.sql + ")", e);
+        return MakeExpr<DataType::NUMERIC>("-(" + e.sql + ")", e);
     }
 
     template<ExprOrColConcept expr>
     auto operator+(const expr &e) {
-        return MakeExpr("+(" + e.sql + ")", e);
+        return MakeExpr<DataType::NUMERIC>("+(" + e.sql + ")", e);
     }
 
     template<ExprOrColConcept expr>
     auto operator!(const expr &e) {
-        return MakeExpr("NOT (" + e.sql + ")", e);
+        return MakeExpr<DataType::NUMERIC>("NOT (" + e.sql + ")", e);
     }
 
     template<ExprOrColConcept expr>
     auto operator~(const expr &e) {
-        return MakeExpr("~ (" + e.sql + ")", e);
+        return MakeExpr<DataType::NUMERIC>("~ (" + e.sql + ")", e);
     }
 
     template<ExprOrColConcept expr>
     auto Brackets(const expr &e) {
-        return MakeExpr("(" + e.sql + ")", e);
+        return MakeExpr<DataType::NUMERIC>("(" + e.sql + ")", e);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator+(const lhs &left, const rhs &right) {
-        return MakeExpr(left.sql + " + " + right.sql, left, right);
+        return MakeExpr<DataType::NUMERIC>(left.sql + " + " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator-(const lhs &left, const rhs &right) {
-        return MakeExpr(left.sql + " - " + right.sql, left, right);
+        return MakeExpr<DataType::NUMERIC>(left.sql + " - " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator*(const lhs &left, const rhs &right) {
-        return MakeExpr(left.sql + " * " + right.sql, left, right);
+        return MakeExpr<DataType::NUMERIC>(left.sql + " * " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator/(const lhs &left, const rhs &right) {
-        return MakeExpr(left.sql + " / " + right.sql, left, right);
+        return MakeExpr<DataType::NUMERIC>(left.sql + " / " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator%(const lhs &left, const rhs &right) {
-        return MakeExpr(left.sql + " % " + right.sql, left, right);
+        return MakeExpr<DataType::NUMERIC>(left.sql + " % " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator^(const lhs &left, const rhs &right) {
-        return MakeExpr(left.sql + " ^ " + right.sql, left, right);
+        return MakeExpr<DataType::NUMERIC>(left.sql + " ^ " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator&&(const lhs &left, const rhs &right) {
-        return MakeExpr("(" + left.sql + ") AND (" + right.sql + ")", left, right);
+        return MakeExpr<DataType::NUMERIC>("(" + left.sql + ") AND (" + right.sql + ")", left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator||(const lhs &left, const rhs &right) {
-        return MakeExpr("(" + left.sql + ") OR (" + right.sql + ")", left, right);
+        return MakeExpr<DataType::NUMERIC>("(" + left.sql + ") OR (" + right.sql + ")", left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator&(const lhs &left, const rhs &right) {
-        return MakeExpr(left.sql + " & " + right.sql, left, right);
+        return MakeExpr<DataType::NUMERIC>(left.sql + " & " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator|(const lhs &left, const rhs &right) {
-        return MakeExpr(left.sql + " | " + right.sql, left, right);
+        return MakeExpr<DataType::NUMERIC>(left.sql + " | " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator==(const lhs &left, const rhs &right) {
-        return MakeExpr(left.sql + " = " + right.sql, left, right);
+        return MakeExpr<DataType::NUMERIC>(left.sql + " = " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator!=(const lhs &left, const rhs &right) {
-        return MakeExpr(left.sql + " <> " + right.sql, left, right);
+        return MakeExpr<DataType::NUMERIC>(left.sql + " <> " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator<(const lhs &left, const rhs &right) {
-        return MakeExpr(left.sql + " < " + right.sql, left, right);
+        return MakeExpr<DataType::NUMERIC>(left.sql + " < " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator<=(const lhs &left, const rhs &right) {
-        return MakeExpr(left.sql + " <= " + right.sql, left, right);
+        return MakeExpr<DataType::NUMERIC>(left.sql + " <= " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator>(const lhs &left, const rhs &right) {
-        return MakeExpr(left.sql + " > " + right.sql, left, right);
+        return MakeExpr<DataType::NUMERIC>(left.sql + " > " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator>=(const lhs &left, const rhs &right) {
-        return MakeExpr(left.sql + " >= " + right.sql, left, right);
+        return MakeExpr<DataType::NUMERIC>(left.sql + " >= " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator<<(const lhs &left, const rhs &right) {
-        return MakeExpr(left.sql + " << " + right.sql, left, right);
+        return MakeExpr<DataType::NUMERIC>(left.sql + " << " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator>>(const lhs &left, const rhs &right) {
-        return MakeExpr(left.sql + " >> " + right.sql, left, right);
+        return MakeExpr<DataType::NUMERIC>(left.sql + " >> " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto Like(const lhs &left, const rhs &right) {
-        return MakeExpr(left.sql + " LIKE " + right.sql, left, right);
+        return MakeExpr<DataType::NUMERIC>(left.sql + " LIKE " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto Glob(const lhs &left, const rhs &right) {
-        return MakeExpr(left.sql + " GLOB " + right.sql, left, right);
+        return MakeExpr<DataType::NUMERIC>(left.sql + " GLOB " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto Regexp(const lhs &left, const rhs &right) {
-        return MakeExpr(left.sql + " REGEXP " + right.sql, left, right);
+        return MakeExpr<DataType::NUMERIC>(left.sql + " REGEXP " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto Match(const lhs &left, const rhs &right) {
-        return MakeExpr(left.sql + " MATCH " + right.sql, left, right);
+        return MakeExpr<DataType::NUMERIC>(left.sql + " MATCH " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto IsNull(const lhs &left, const rhs &right) {
-        return MakeExpr(left.sql + " IS NULL " + right.sql, left, right);
+        return MakeExpr<DataType::NUMERIC>(left.sql + " IS NULL " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto IsNotNull(const lhs &left, const rhs &right) {
-        return MakeExpr(left.sql + " IS NOT NULL " + right.sql, left, right);
+        return MakeExpr<DataType::NUMERIC>(left.sql + " IS NOT NULL " + right.sql, left, right);
     }
 
     //TODO 確認In功能
@@ -258,7 +258,7 @@ namespace TypeSQLite {
         if constexpr (sizeof...(rest) == 0) {
             return first.sql;
         } else {
-            return MakeExpr(first.sql + ", " + MakeExprList(rest...).sql, first, MakeExprList(rest...));
+            return MakeExpr<DataType::NUMERIC>(first.sql + ", " + MakeExprList(rest...).sql, first, MakeExprList(rest...));
         }
     }
 
