@@ -10,7 +10,7 @@ namespace TypeSQLite {
         std::string sql = "DATE(" + timeValue.sql;
         ((sql += ", " + modifiers.sql), ...);
         sql += ")";
-        return MakeExpr<DataType::TEXT>(sql, timeValue, modifiers...);
+        return MakeExpr<std::string>(sql, timeValue, modifiers...);
     }
 
     // DATETIME - Extract datetime (requires at least one time-value)
@@ -19,7 +19,7 @@ namespace TypeSQLite {
         std::string sql = "DATETIME(" + timeValue.sql;
         ((sql += ", " + modifiers.sql), ...);
         sql += ")";
-        return MakeExpr<DataType::TEXT>(sql, timeValue, modifiers...);
+        return MakeExpr<std::string>(sql, timeValue, modifiers...);
     }
 
     // JULIANDAY - Julian day number (requires at least one time-value)
@@ -28,7 +28,7 @@ namespace TypeSQLite {
         std::string sql = "JULIANDAY(" + timeValue.sql;
         ((sql += ", " + modifiers.sql), ...);
         sql += ")";
-        return MakeExpr<DataType::NUMERIC>(sql, timeValue, modifiers...);
+        return MakeExpr<double>(sql, timeValue, modifiers...);
     }
 
     // STRFTIME - Format time (requires format and at least one time-value)
@@ -37,7 +37,7 @@ namespace TypeSQLite {
         std::string sql = "STRFTIME(" + format.sql + ", " + timeValue.sql;
         ((sql += ", " + modifiers.sql), ...);
         sql += ")";
-        return MakeExpr<DataType::TEXT>(sql, format, timeValue, modifiers...);
+        return MakeExpr<std::string>(sql, format, timeValue, modifiers...);
     }
 
     // TIME - Extract time (requires at least one time-value)
@@ -46,14 +46,14 @@ namespace TypeSQLite {
         std::string sql = "TIME(" + timeValue.sql;
         ((sql += ", " + modifiers.sql), ...);
         sql += ")";
-        return MakeExpr<DataType::TEXT>(sql, timeValue, modifiers...);
+        return MakeExpr<std::string>(sql, timeValue, modifiers...);
     }
 
     // TIMEDIFF - Difference between two times
     template<ExprOrColConcept Time1, ExprOrColConcept Time2>
     auto TimeDiff(const Time1 &time1, const Time2 &time2) {
         std::string sql = "TIMEDIFF(" + time1.sql + ", " + time2.sql + ")";
-        return MakeExpr<DataType::TEXT>(sql, time1, time2);
+        return MakeExpr<std::string>(sql, time1, time2);
     }
 
     template<ExprOrColConcept TimeValue, ExprOrColConcept... Modifiers>
@@ -61,7 +61,7 @@ namespace TypeSQLite {
         std::string sql = "UNIXEPOCH(" + timeValue.sql;
         ((sql += ", " + modifiers.sql), ...);
         sql += ")";
-        return MakeExpr<DataType::INTEGER>(sql, timeValue, modifiers...);
+        return MakeExpr<int>(sql, timeValue, modifiers...);
     }
 
 } // namespace TypeSQLite

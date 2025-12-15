@@ -86,11 +86,11 @@ namespace TypeSQLite {
         template<typename _Where, bool AllowEmptyWhere, ColumnOrTableColumnConcept... Ts>
         class [[nodiscard("You must call Execute() for the query to run.")]] UpdateStatement {
             const Table &_table;
-            std::tuple<ExprResultValueType<Ts>...> datas;
+            std::tuple<ExprOrColReturnType<Ts>...> datas;
             _Where _where;
 
         public:
-            explicit UpdateStatement(_Where where, const Table &table, ExprResultValueType<Ts>... ts) : _table(table),
+            explicit UpdateStatement(_Where where, const Table &table, ExprOrColReturnType<Ts>... ts) : _table(table),
                 datas(ts...),
                 _where(where) {
             }
@@ -214,7 +214,7 @@ namespace TypeSQLite {
         }
 
         template<typename... U>
-        void Insert(ExprResultValueType<U>... values) {
+        void Insert(ExprOrColReturnType<U>... values) {
             //TODO 重啟檢查
 
             // static_assert(IsTypeGroupSubset<TypeGroup<U...>, columns>(),
@@ -235,7 +235,7 @@ namespace TypeSQLite {
 
         // 批量插入支援
         template<typename... U>
-        void InsertMany(const std::vector<std::tuple<ExprResultValueType<U>...> > &rows) {
+        void InsertMany(const std::vector<std::tuple<ExprOrColReturnType<U>...> > &rows) {
             //TODO 重啟檢查
 
             // static_assert(IsTypeGroupSubset<TypeGroup<U...>, columns>(),
@@ -270,7 +270,7 @@ namespace TypeSQLite {
         }
 
         template<typename... U>
-        void Upsert(ExprResultValueType<U>... values) {
+        void Upsert(ExprOrColReturnType<U>... values) {
             //TODO 重啟檢查
 
             // static_assert(IsTypeGroupSubset<TypeGroup<U...>, columns>(),
@@ -292,7 +292,7 @@ namespace TypeSQLite {
         }
 
         template<ColumnOrTableColumnConcept... U>
-        auto Update(ExprResultValueType<U>... values) {
+        auto Update(ExprOrColReturnType<U>... values) {
             //TODO 重啟檢查
 
             // static_assert(IsTypeGroupSubset<TypeGroup<U...>, columns>(),

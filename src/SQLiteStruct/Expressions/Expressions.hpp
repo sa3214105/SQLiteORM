@@ -9,9 +9,9 @@
 
 //TODO 由於JsonFunction實作較複雜暫時不實作
 namespace TypeSQLite {
-    template<DataType exprResultType, typename Columns, typename Parameters>
+    template<typename ReturnType, typename Columns, typename Parameters>
     struct Expressions {
-        constexpr static DataType resultType = exprResultType;
+        using returnType = ReturnType;
         const Columns cols;
         const std::string sql;
         const Parameters params;
@@ -20,12 +20,13 @@ namespace TypeSQLite {
     template<typename T>
     concept ExpressionsConcept = requires(T t)
     {
-        { T::resultType } -> std::convertible_to<DataType>;
+        typename T::returnType;
         { t.cols };
         { t.sql } -> std::convertible_to<std::string>;
         { t.params };
-    } && (std::derived_from<T, Expressions<T::resultType, std::decay_t<decltype(std::declval<T>().cols)>, std::decay_t<
-        decltype(std::declval<T>().params)> > >);
+    } && (std::derived_from<T, Expressions<typename T::returnType, std::decay_t<decltype(std::declval<T>().cols)>,
+        std::decay_t<
+            decltype(std::declval<T>().params)> > >);
 
     template<typename T>
     concept NullAbleExpr = ExpressionsConcept<T> && std::is_same_v<T, std::nullptr_t>;
@@ -54,28 +55,41 @@ namespace TypeSQLite {
         }
     }
 
-    template<DataType dataType, ExprOrColConcept ...Exps>
+    template<typename returnType, ExprOrColConcept ...Exps>
     auto MakeExpr(std::string newSQL, Exps... exps) {
         auto newCols = std::tuple_cat(GetCols(exps)...);
         auto newPara = std::tuple_cat(GetParms(exps)...);
-        return Expressions<dataType, decltype(newCols), decltype(newPara)>{
+        return Expressions<returnType, decltype(newCols), decltype(newPara)>{
             .cols = newCols,
             .sql = newSQL,
             .params = newPara
         };
     }
 
-    //TODO 目前multyType會誤判 等之後型別調整再處理
+    //ExprOrColReturnType
+    //TODO 移到Column.hpp
     template<typename expr>
-    using ExprResultValueType = std::conditional_t<expr::resultType == DataType::TEXT, std::string,
+    using ColumnReturnType = std::conditional_t<expr::resultType == DataType::TEXT, std::string,
         std::conditional_t<expr::resultType == DataType::NUMERIC, double,
             std::conditional_t<expr::resultType == DataType::INTEGER, int,
                 std::conditional_t<expr::resultType == DataType::REAL, double,
                     std::vector<uint8_t> > > > >;
 
+    template<typename expr>
+    struct ExprOrColReturnTypeImpl{
+        using type = expr::returnType;
+    };
+
+    template<ColumnOrTableColumnConcept col>
+    struct ExprOrColReturnTypeImpl<col> {
+        using type = ColumnReturnType<col>;
+    };
+    template<typename T>
+    using ExprOrColReturnType = typename ExprOrColReturnTypeImpl<T>::type;
+
     // sqlite literal
     inline auto operator""_expr(const char *str, size_t) {
-        return Expressions<DataType::TEXT, std::tuple<>, std::tuple<std::string> >{
+        return Expressions<std::string, std::tuple<>, std::tuple<std::string> >{
             .cols = std::tuple<>{},
             .sql = "?",
             .params = std::make_tuple(std::string(str))
@@ -83,7 +97,7 @@ namespace TypeSQLite {
     }
 
     inline auto operator""_expr(const long double value) {
-        return Expressions<DataType::NUMERIC, std::tuple<>, std::tuple<double> >{
+        return Expressions<double, std::tuple<>, std::tuple<double> >{
             .cols = std::tuple<>{},
             .sql = "?",
             .params = std::make_tuple(static_cast<double>(value))
@@ -91,7 +105,7 @@ namespace TypeSQLite {
     }
 
     inline auto operator""_expr(const unsigned long long value) {
-        return Expressions<DataType::NUMERIC, std::tuple<>, std::tuple<double> >{
+        return Expressions<int, std::tuple<>, std::tuple<double> >{
             .cols = std::tuple<>{},
             .sql = "?",
             .params = std::make_tuple(static_cast<double>(value))
@@ -100,128 +114,128 @@ namespace TypeSQLite {
 
     template<ExprOrColConcept expr>
     auto operator-(const expr &e) {
-        return MakeExpr<DataType::NUMERIC>("-(" + e.sql + ")", e);
+        return MakeExpr<double>("-(" + e.sql + ")", e);
     }
 
     template<ExprOrColConcept expr>
     auto operator+(const expr &e) {
-        return MakeExpr<DataType::NUMERIC>("+(" + e.sql + ")", e);
+        return MakeExpr<double>("+(" + e.sql + ")", e);
     }
 
     template<ExprOrColConcept expr>
     auto operator!(const expr &e) {
-        return MakeExpr<DataType::NUMERIC>("NOT (" + e.sql + ")", e);
+        return MakeExpr<double>("NOT (" + e.sql + ")", e);
     }
 
     template<ExprOrColConcept expr>
     auto operator~(const expr &e) {
-        return MakeExpr<DataType::NUMERIC>("~ (" + e.sql + ")", e);
+        return MakeExpr<double>("~ (" + e.sql + ")", e);
     }
 
     template<ExprOrColConcept expr>
     auto Brackets(const expr &e) {
-        return MakeExpr<DataType::NUMERIC>("(" + e.sql + ")", e);
+        return MakeExpr<double>("(" + e.sql + ")", e);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator+(const lhs &left, const rhs &right) {
-        return MakeExpr<DataType::NUMERIC>(left.sql + " + " + right.sql, left, right);
+        return MakeExpr<double>(left.sql + " + " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator-(const lhs &left, const rhs &right) {
-        return MakeExpr<DataType::NUMERIC>(left.sql + " - " + right.sql, left, right);
+        return MakeExpr<double>(left.sql + " - " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator*(const lhs &left, const rhs &right) {
-        return MakeExpr<DataType::NUMERIC>(left.sql + " * " + right.sql, left, right);
+        return MakeExpr<double>(left.sql + " * " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator/(const lhs &left, const rhs &right) {
-        return MakeExpr<DataType::NUMERIC>(left.sql + " / " + right.sql, left, right);
+        return MakeExpr<double>(left.sql + " / " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator%(const lhs &left, const rhs &right) {
-        return MakeExpr<DataType::NUMERIC>(left.sql + " % " + right.sql, left, right);
+        return MakeExpr<double>(left.sql + " % " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator^(const lhs &left, const rhs &right) {
-        return MakeExpr<DataType::NUMERIC>(left.sql + " ^ " + right.sql, left, right);
+        return MakeExpr<double>(left.sql + " ^ " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator&&(const lhs &left, const rhs &right) {
-        return MakeExpr<DataType::NUMERIC>("(" + left.sql + ") AND (" + right.sql + ")", left, right);
+        return MakeExpr<double>("(" + left.sql + ") AND (" + right.sql + ")", left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator||(const lhs &left, const rhs &right) {
-        return MakeExpr<DataType::NUMERIC>("(" + left.sql + ") OR (" + right.sql + ")", left, right);
+        return MakeExpr<double>("(" + left.sql + ") OR (" + right.sql + ")", left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator&(const lhs &left, const rhs &right) {
-        return MakeExpr<DataType::NUMERIC>(left.sql + " & " + right.sql, left, right);
+        return MakeExpr<double>(left.sql + " & " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator|(const lhs &left, const rhs &right) {
-        return MakeExpr<DataType::NUMERIC>(left.sql + " | " + right.sql, left, right);
+        return MakeExpr<double>(left.sql + " | " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator==(const lhs &left, const rhs &right) {
-        return MakeExpr<DataType::NUMERIC>(left.sql + " = " + right.sql, left, right);
+        return MakeExpr<double>(left.sql + " = " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator!=(const lhs &left, const rhs &right) {
-        return MakeExpr<DataType::NUMERIC>(left.sql + " <> " + right.sql, left, right);
+        return MakeExpr<double>(left.sql + " <> " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator<(const lhs &left, const rhs &right) {
-        return MakeExpr<DataType::NUMERIC>(left.sql + " < " + right.sql, left, right);
+        return MakeExpr<double>(left.sql + " < " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator<=(const lhs &left, const rhs &right) {
-        return MakeExpr<DataType::NUMERIC>(left.sql + " <= " + right.sql, left, right);
+        return MakeExpr<double>(left.sql + " <= " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator>(const lhs &left, const rhs &right) {
-        return MakeExpr<DataType::NUMERIC>(left.sql + " > " + right.sql, left, right);
+        return MakeExpr<double>(left.sql + " > " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator>=(const lhs &left, const rhs &right) {
-        return MakeExpr<DataType::NUMERIC>(left.sql + " >= " + right.sql, left, right);
+        return MakeExpr<double>(left.sql + " >= " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator<<(const lhs &left, const rhs &right) {
-        return MakeExpr<DataType::NUMERIC>(left.sql + " << " + right.sql, left, right);
+        return MakeExpr<double>(left.sql + " << " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto operator>>(const lhs &left, const rhs &right) {
-        return MakeExpr<DataType::NUMERIC>(left.sql + " >> " + right.sql, left, right);
+        return MakeExpr<double>(left.sql + " >> " + right.sql, left, right);
     }
 
     // Note: REGEXP and MATCH are pattern matching operators
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto Regexp(const lhs &left, const rhs &right) {
-        return MakeExpr<DataType::NUMERIC>(left.sql + " REGEXP " + right.sql, left, right);
+        return MakeExpr<double>(left.sql + " REGEXP " + right.sql, left, right);
     }
 
     template<ExprOrColConcept lhs, ExprOrColConcept rhs>
     auto Match(const lhs &left, const rhs &right) {
-        return MakeExpr<DataType::NUMERIC>(left.sql + " MATCH " + right.sql, left, right);
+        return MakeExpr<double>(left.sql + " MATCH " + right.sql, left, right);
     }
 
     //TODO 確認In功能
@@ -231,7 +245,7 @@ namespace TypeSQLite {
         constexpr auto newSQL = left.sql + " BETWEEN " + mid.sql + " AND " + right.sql;
         auto newCols = std::tuple_cat(left.cols, mid.cols, right.cols);
         auto newPara = std::tuple_cat(left.params, mid.params, right.params);
-        return Expressions<DataType::NUMERIC, decltype(newCols), decltype(newPara)>{
+        return Expressions<int, decltype(newCols), decltype(newPara)>{
             .cols = newCols,
             .sql = newSQL,
             .params = newPara
@@ -243,17 +257,18 @@ namespace TypeSQLite {
     auto Cast(const T &expr) {
         std::string typeStr;
         if constexpr (targetType == DataType::INTEGER) {
-            typeStr = "INTEGER";
+            return MakeExpr<int>("CAST(" + expr.sql + " AS INTEGER)", expr);
         } else if constexpr (targetType == DataType::REAL) {
-            typeStr = "REAL";
+            return MakeExpr<double>("CAST(" + expr.sql + " AS REAL)", expr);
         } else if constexpr (targetType == DataType::TEXT) {
-            typeStr = "TEXT";
+            return MakeExpr<std::string>("CAST(" + expr.sql + " AS TEXT)", expr);
         } else if constexpr (targetType == DataType::BLOB) {
-            typeStr = "BLOB";
+            return MakeExpr<std::vector<uint8_t> >("CAST(" + expr.sql + " AS BLOB)", expr);
+        } else if constexpr (targetType == DataType::NUMERIC) {
+            return MakeExpr<double>("CAST(" + expr.sql + " AS NUMERIC)", expr);
         } else {
-            typeStr = "NUMERIC";
+            static_assert(targetType != targetType, "Unsupported target type for Cast");
         }
-        return MakeExpr<targetType>("CAST(" + expr.sql + " AS " + typeStr + ")", expr);
     }
 
     template<typename /*ExprOrColConcept*/ expr, typename/*ExprOrColConcept*/... exprs>

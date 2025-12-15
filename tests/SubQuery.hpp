@@ -47,9 +47,6 @@ TEST_F(SubQueryTest, SimpleSubQuery) {
     // 子查詢：選擇有訂單的用戶
     auto subQuery = orderTable.Select(orderTable[UserColumn]).Distinct();
 
-    auto x = orderTable.Select(
-        Count(orderTable[UserColumn])
-    ).Where(orderTable[UserColumn] == userTable[IdColumn]).resultType;
     // 主查詢：選擇用戶名稱，條件是用戶ID在子查詢結果中
     auto results = userTable.Select(
                 userTable[IdColumn],

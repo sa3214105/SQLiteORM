@@ -8,10 +8,10 @@
 #include "../Expressions/Expressions.hpp"
 
 namespace TypeSQLite {
-    template<DataType exprResultType, typename WindowFuncCols, typename WindowFuncParams, typename PartitionBy, typename
+    template<typename ReturnType, typename WindowFuncCols, typename WindowFuncParams, typename PartitionBy, typename
         OrderExpr>
     struct WindowFuncInfo {
-        constexpr static DataType resultType = exprResultType;
+        using returnType = ReturnType;
         const std::string windowFuncSql;
         const WindowFuncCols windowFuncCols;
         const WindowFuncParams windowFuncParams;
@@ -20,11 +20,11 @@ namespace TypeSQLite {
         OrderType orderType = OrderType::ASC;
     };
 
-    template<DataType exprResultType, typename WindowFuncCols, typename WindowFuncParams, typename PartitionBy, typename
+    template<typename ReturnType, typename WindowFuncCols, typename WindowFuncParams, typename PartitionBy, typename
         OrderExpr>
     auto MakeInfo(std::string sql, WindowFuncCols cols, WindowFuncParams params, PartitionBy partitionBy,
                   OrderExpr orderExpr, OrderType orderType = OrderType::ASC) {
-        return WindowFuncInfo<exprResultType, WindowFuncCols, WindowFuncParams, PartitionBy, OrderExpr>{
+        return WindowFuncInfo<ReturnType, WindowFuncCols, WindowFuncParams, PartitionBy, OrderExpr>{
             .windowFuncSql = sql,
             .windowFuncCols = cols,
             .windowFuncParams = params,
@@ -78,7 +78,7 @@ namespace TypeSQLite {
     template<typename Columns, typename Parameters, typename Info>
     class WindowFunctions {
     public:
-        constexpr static DataType resultType = Info::resultType;
+        using returnType = Info::returnType;
         const Info info;
         const Columns cols;
         const Parameters params;
@@ -86,7 +86,7 @@ namespace TypeSQLite {
 
         template<ExprOrColConcept... Exprs>
         auto PartitionedBy(Exprs... exprs) {
-            auto _info = MakeInfo<resultType>(
+            auto _info = MakeInfo<returnType>(
                 info.windowFuncSql,
                 info.windowFuncCols,
                 info.windowFuncParams,
@@ -96,7 +96,7 @@ namespace TypeSQLite {
             );
             auto newCols = GetInfoCols(_info);
             auto newParams = GetInfoParams(_info);
-            return WindowFunctions<decltype(newCols),decltype(newParams),decltype(_info)>{
+            return WindowFunctions<decltype(newCols), decltype(newParams), decltype(_info)>{
                 .info = _info,
                 .cols = newCols,
                 .params = newParams,
@@ -106,7 +106,7 @@ namespace TypeSQLite {
 
         template<ExprOrColConcept Expr>
         auto OrderBy(Expr expr, const OrderType order = OrderType::ASC) {
-            auto _info = MakeInfo<resultType>(
+            auto _info = MakeInfo<returnType>(
                 info.windowFuncSql,
                 info.windowFuncCols,
                 info.windowFuncParams,
@@ -116,7 +116,7 @@ namespace TypeSQLite {
             );
             auto newCols = GetInfoCols(_info);
             auto newParams = GetInfoParams(_info);
-            return WindowFunctions<decltype(newCols),decltype(newParams),decltype(_info)>{
+            return WindowFunctions<decltype(newCols), decltype(newParams), decltype(_info)>{
                 .info = _info,
                 .cols = newCols,
                 .params = newParams,
@@ -136,11 +136,11 @@ namespace TypeSQLite {
     template<typename T>
     concept WindowFunctionsConcept = IsWindowFunctions<T>::value;
 
-    template<DataType DataType, ExprOrColConcept ... Exprs>
+    template<typename ReturnType, ExprOrColConcept ... Exprs>
     auto MakeWindowFunction(std::string newSQL, Exprs... exprs) {
         auto newCols = std::tuple_cat(GetCols(exprs)...);
         auto newPara = std::tuple_cat(GetParms(exprs)...);
-        auto info = MakeInfo<DataType>(
+        auto info = MakeInfo<ReturnType>(
             newSQL,
             newCols,
             newPara,
@@ -156,77 +156,77 @@ namespace TypeSQLite {
     }
 
     inline auto RowNumber() {
-        return MakeWindowFunction<DataType::INTEGER>(" ROW_NUMBER()");
+        return MakeWindowFunction<int>(" ROW_NUMBER()");
     }
 
     inline auto Rank() {
-        return MakeWindowFunction<DataType::INTEGER>(" RANK()");
+        return MakeWindowFunction<int>(" RANK()");
     }
 
     inline auto DenseRank() {
-        return MakeWindowFunction<DataType::INTEGER>(" DENSE_RANK()");
+        return MakeWindowFunction<int>(" DENSE_RANK()");
     }
 
     inline auto PercentRank() {
-        return MakeWindowFunction<DataType::NUMERIC>(" PERCENT_RANK()");
+        return MakeWindowFunction<double>(" PERCENT_RANK()");
     }
 
     inline auto CumeDist() {
-        return MakeWindowFunction<DataType::NUMERIC>(" CUME_DIST()");
+        return MakeWindowFunction<double>(" CUME_DIST()");
     }
 
     //TODO 限定int Expr
     template<ExprOrColConcept Expr>
     auto NTile(Expr n) {
-        return MakeWindowFunction<DataType::INTEGER>(" NTILE(" + n.sql + ")", n);
+        return MakeWindowFunction<int>(" NTILE(" + n.sql + ")", n);
     }
 
     template<ExprOrColConcept Expr>
     auto Lag(Expr expr) {
-        return MakeWindowFunction<Expr::resultType>(" LAG(" + expr.sql + ")", expr);
+        return MakeWindowFunction<ExprOrColReturnType<Expr>>(" LAG(" + expr.sql + ")", expr);
     }
 
     template<ExprOrColConcept Expr, ExprOrColConcept Offset>
     auto Lag(Expr expr, Offset offset) {
-        return MakeWindowFunction<Expr::resultType>(" LAG(" + expr.sql + ", " + offset.sql + ")", expr, offset);
+        return MakeWindowFunction<ExprOrColReturnType<Expr>>(" LAG(" + expr.sql + ", " + offset.sql + ")", expr, offset);
     }
 
     template<ExprOrColConcept Expr, ExprOrColConcept Offset, ExprOrColConcept Default>
     auto Lag(Expr expr, Offset offset, Default defaultValue) {
-        return MakeWindowFunction<Expr::resultType>(
+        return MakeWindowFunction<ExprOrColReturnType<Expr>>(
             " LAG(" + expr.sql + ", " + offset.sql + ", " + defaultValue.sql + ")", expr, offset,
             defaultValue);
     }
 
     template<ExprOrColConcept Expr>
     auto Lead(Expr expr) {
-        return MakeWindowFunction<Expr::resultType>(" LEAD(" + expr.sql + ")", expr);
+        return MakeWindowFunction<ExprOrColReturnType<Expr>>(" LEAD(" + expr.sql + ")", expr);
     }
 
     template<ExprOrColConcept Expr, ExprOrColConcept Offset>
     auto Lead(Expr expr, Offset offset) {
-        return MakeWindowFunction<Expr::resultType>(" LEAD(" + expr.sql + ", " + offset.sql + ")", expr, offset);
+        return MakeWindowFunction<ExprOrColReturnType<Expr>>(" LEAD(" + expr.sql + ", " + offset.sql + ")", expr, offset);
     }
 
     template<ExprOrColConcept Expr, ExprOrColConcept Offset, ExprOrColConcept Default>
     auto Lead(Expr expr, Offset offset, Default defaultValue) {
-        return MakeWindowFunction<Expr::resultType>(
+        return MakeWindowFunction<ExprOrColReturnType<Expr>>(
             " LEAD(" + expr.sql + ", " + offset.sql + ", " + defaultValue.sql + ")", expr, offset,
             defaultValue);
     }
 
     template<ExprOrColConcept Expr>
     auto FirstValue(Expr expr) {
-        return MakeWindowFunction<Expr::resultType>(" FIRST_VALUE(" + expr.sql + ")", expr);
+        return MakeWindowFunction<ExprOrColReturnType<Expr>>(" FIRST_VALUE(" + expr.sql + ")", expr);
     }
 
     template<ExprOrColConcept Expr>
     auto LastValue(Expr expr) {
-        return MakeWindowFunction<Expr::resultType>(" LAST_VALUE(" + expr.sql + ")", expr);
+        return MakeWindowFunction<ExprOrColReturnType<Expr>>(" LAST_VALUE(" + expr.sql + ")", expr);
     }
 
     template<ExprOrColConcept Expr, ExprOrColConcept N>
     auto NthValue(Expr expr, N n) {
-        return MakeWindowFunction<Expr::resultType>(" NTH_VALUE(" + expr.sql + ", " + n.sql + ")", expr, n);
+        return MakeWindowFunction<ExprOrColReturnType<Expr>>(" NTH_VALUE(" + expr.sql + ", " + n.sql + ")", expr, n);
     }
 }

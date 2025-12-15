@@ -34,6 +34,18 @@ namespace TypeSQLite {
         }
     }
 
+    template<typename>
+    struct ReturnTypesImpl;
+
+    template<typename ... Cols>
+    struct ReturnTypesImpl<std::tuple<Cols...> > {
+        using type = std::conditional_t<std::tuple_size_v<std::tuple<Cols...>> == 1, ExprOrColReturnType<std::tuple_element_t<0, std::tuple<Cols...>> >,
+        std::tuple<ExprOrColReturnType<Cols>...> >;
+    };
+
+    template<typename Cols>
+    using ReturnTypes = typename ReturnTypesImpl<Cols>::type;
+
     //TODO GroupBy是ExpressionsConcept tuple
     template<
         typename Source,
@@ -140,7 +152,7 @@ namespace TypeSQLite {
         class [[nodiscard("You must call Result() for the query to run.")]]
                 SelectStatement
                 : public Expressions<
-                    GetSelectResultDataType<decltype(std::declval<Info>().resultColumns)>(),
+                    ReturnTypes<decltype(std::declval<Info>().resultColumns)>,
                     decltype(GetSelectInfoCols(std::declval<Info>())),
                     decltype(GetSelectInfoParams(std::declval<Info>()))
                 > {
@@ -150,12 +162,12 @@ namespace TypeSQLite {
         public:
             explicit SelectStatement(const SQLiteWrapper &sqlite, Info info)
                 : Expressions<
-                      GetSelectResultDataType<decltype(std::declval<Info>().resultColumns)>(),
+                      ReturnTypes<decltype(std::declval<Info>().resultColumns)>,
                       decltype(GetSelectInfoCols(std::declval<Info>())),
                       decltype(GetSelectInfoParams(std::declval<Info>()))
                   >{
                       .cols = GetSelectInfoCols(info),
-                      .sql = "("+GetInfoSql(info)+")",
+                      .sql = "(" + GetInfoSql(info) + ")",
                       .params = GetSelectInfoParams(info)
                   },
                   _sqlite(sqlite),
@@ -226,8 +238,8 @@ namespace TypeSQLite {
             auto Results() {
                 return std::apply([this](auto... params) {
                     return std::apply([this,&params...](auto... results) {
-                        return _sqlite.Query<ExprResultValueType<decltype(results)>
-                            ...>(GetInfoSql(_info)+";", params...);
+                        return _sqlite.Query<ExprOrColReturnType<decltype(results)>
+                            ...>(GetInfoSql(_info) + ";", params...);
                     }, _info.resultColumns);
                 }, this->params);
             }
