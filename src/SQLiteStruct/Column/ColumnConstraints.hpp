@@ -5,10 +5,17 @@
 #include "../../TemplateHelper/TypeGroup.hpp"
 
 namespace TypeSQLite {
-    template<OrderType order = OrderType::ASC, ConflictCause conflictCause = ConflictCause::ABORT>
+    template<OrderType order = OrderType::ASC, ConflictCause conflictCause = ConflictCause::ABORT, bool autoIncrement =
+            false>
     struct ColumnPrimaryKey {
-        constexpr static FixedString value = FixedString("PRIMARY KEY") + OrderTypeToString<order>() +
-                                             ConflictCauseToString<conflictCause>();
+        constexpr static FixedString value = [] {
+            if constexpr (autoIncrement) {
+                return FixedString("PRIMARY KEY") + OrderTypeToString<order>() + ConflictCauseToString<conflictCause>()
+                       + FixedString(" AUTOINCREMENT");
+            } else {
+                return FixedString("PRIMARY KEY") + OrderTypeToString<order>() + ConflictCauseToString<conflictCause>();
+            }
+        }();
     };
 
     template<ConflictCause conflictCause = ConflictCause::ABORT>
@@ -52,8 +59,8 @@ namespace TypeSQLite {
     struct IsColumnConstraint : std::false_type {
     };
 
-    template<OrderType order, ConflictCause conflictCause>
-    struct IsColumnConstraint<ColumnPrimaryKey<order, conflictCause> > : std::true_type {
+    template<OrderType order, ConflictCause conflictCause, bool autoIncrement>
+    struct IsColumnConstraint<ColumnPrimaryKey<order, conflictCause, autoIncrement> > : std::true_type {
     };
 
     template<ConflictCause conflictCause>

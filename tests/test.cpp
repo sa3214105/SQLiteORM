@@ -18,6 +18,7 @@
 #include "MathFunctionsTest.hpp"
 #include "ScalarFunctionsTest.hpp"
 #include "DateTimeFunctionsTest.hpp"
+#include "SubQuery.hpp"
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);

@@ -1,11 +1,13 @@
 #pragma once
 namespace TypeSQLite {
+    //TODO 分離ExprType以及colType
     enum class DataType {
         TEXT,
         NUMERIC,
         INTEGER,
         REAL,
-        BLOB
+        BLOB,
+        MULTY_TYPE,
     };
     template<DataType type>
     constexpr auto DataTypeToString() {

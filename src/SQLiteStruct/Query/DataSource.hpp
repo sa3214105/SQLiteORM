@@ -98,9 +98,21 @@ namespace TypeSQLite {
         }, src.joins);
     }
 
+    template<typename MainSrc, typename... Joins>
+    auto GetExtractSourceCols(const SourceInfo<MainSrc, Joins...> &src) {
+        return std::apply([](const auto &... join) {
+            return std::tuple_cat(GetCols(join.condition)...);
+        }, src.joins);
+    }
+
     // 特化：沒有 JOIN 時返回空 tuple
     template<typename MainSrc>
     auto GetExtractSourceParams(const SourceInfo<MainSrc> &src) {
+        return std::tuple<>();
+    }
+
+    template<typename MainSrc>
+    auto GetExtractSourceCols(const SourceInfo<MainSrc> &src) {
         return std::tuple<>();
     }
 }

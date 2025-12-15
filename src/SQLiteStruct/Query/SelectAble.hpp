@@ -25,6 +25,108 @@ namespace TypeSQLite {
         }(p);
     } || IsQueryAble<T>::value;
 
+    template<typename Cols>
+    constexpr static DataType GetSelectResultDataType() {
+        if constexpr (std::tuple_size_v<Cols> == 1) {
+            return std::tuple_element_t<0, Cols>::resultType;
+        } else {
+            return DataType::MULTY_TYPE;
+        }
+    }
+
+    //TODO GroupBy是ExpressionsConcept tuple
+    template<
+        typename Source,
+        typename Where,
+        typename GroupBy,
+        typename OrderExpr,
+        typename... ResultColumns>
+    struct SelectStatementInfo {
+        Source source;
+        Where where;
+        GroupBy groupBy;
+        OrderExpr orderExpr;
+        std::tuple<ResultColumns...> resultColumns;
+        OrderType orderType = OrderType::ASC;
+        //TODO 支援express limit offset
+        std::optional<std::pair<int, int> > limitOffset;
+        bool isDistinct;
+    };
+
+    template<
+        typename Source,
+        typename Where,
+        typename GroupBy,
+        typename OrderExpr,
+        typename... ResultColumns>
+    auto MakeSelectStatementInfo(
+        Source source,
+        Where where,
+        GroupBy groupBy,
+        OrderExpr orderExpr,
+        OrderType orderType,
+        const std::optional<std::pair<int, int> > &limitOffset,
+        bool isDistinct,
+        ResultColumns... columns
+    ) {
+        return SelectStatementInfo<Source, Where, GroupBy, OrderExpr, ResultColumns...>{
+            .source = source,
+            .where = where,
+            .groupBy = groupBy,
+            .orderExpr = orderExpr,
+            .resultColumns = std::make_tuple(columns...),
+            .orderType = orderType,
+            .limitOffset = limitOffset,
+            .isDistinct = isDistinct
+        };
+    }
+
+    template<typename Info>
+    std::string GetInfoSql(const Info &info) {
+        auto sql = std::string("SELECT ") + (info.isDistinct ? "DISTINCT " : "") +
+                   std::apply([](auto &&... results) { return GetExprSqls(results...); }, info.resultColumns)
+                   + " FROM "
+                   + MakeSourceSQL(info.source);
+        if constexpr (!std::is_null_pointer_v<decltype(info.where)>) {
+            sql += " WHERE " + info.where.sql;
+        }
+        if constexpr (!std::is_null_pointer_v<decltype(info.groupBy)>) {
+            sql += " GROUP BY " + std::apply([](auto &&... expr) { return GetExprSqls(expr...); }, info.groupBy);
+        }
+        if constexpr (!std::is_null_pointer_v<decltype(info.orderExpr)>) {
+            sql += " ORDER BY " + info.orderExpr.sql + " " + OrderTypeToString(info.orderType);
+        }
+        if (info.limitOffset.has_value()) {
+            sql += " LIMIT " + std::to_string(info.limitOffset->first);
+            if (info.limitOffset->second > 0) {
+                sql += " OFFSET " + std::to_string(info.limitOffset->second);
+            }
+        }
+        return sql;
+    };
+
+    template<typename Info>
+    auto GetSelectInfoCols(const Info &info) {
+        return std::tuple_cat(
+            GetExprsTupleColTuple(info.resultColumns),
+            GetExtractSourceCols(info.source),
+            GetExprsColTuple(info.where),
+            GetExprsTupleColTuple(info.groupBy),
+            GetExprsColTuple(info.orderExpr)
+        );
+    };
+
+    template<typename Info>
+    auto GetSelectInfoParams(const Info &info) {
+        return std::tuple_cat(
+            GetExprsTupleParamTuple(info.resultColumns),
+            GetExtractSourceParams(info.source),
+            GetExprsParamTuple(info.where),
+            GetExprsTupleParamTuple(info.groupBy),
+            GetExprsParamTuple(info.orderExpr)
+        );
+    };
+
     template<typename Cols, SourceInfoConcept Source>
     class SelectAble {
     public:
@@ -34,145 +136,102 @@ namespace TypeSQLite {
         SQLiteWrapper &_sqlite;
         const Source _source;
 
-        template<typename _Where, typename _GroupBy, typename _OrderExpr, typename... ResultColumns>
-        class [[nodiscard("You must call Result() for the query to run.")]] SelectStatement {
+        template<typename Info>
+        class [[nodiscard("You must call Result() for the query to run.")]]
+                SelectStatement
+                : public Expressions<
+                    GetSelectResultDataType<decltype(std::declval<Info>().resultColumns)>(),
+                    decltype(GetSelectInfoCols(std::declval<Info>())),
+                    decltype(GetSelectInfoParams(std::declval<Info>()))
+                > {
             const SQLiteWrapper &_sqlite;
-            const Source &_source;
-            _Where _where;
-            _GroupBy _groupBy;
-            _OrderExpr _orderExpr;
-            OrderType _orderType = OrderType::ASC;
-            std::tuple<ResultColumns...> _resultColumns;
-            //TODO 支援express limit offset
-            std::optional<std::pair<int, int> > _limitOffset;
-            bool _isDistinct;
-
-            auto GetResultColumnParamTuple() const {
-                return std::apply([&](auto &&... columns) {
-                    return std::tuple_cat(([]<typename T>(const T &col) {
-                        if constexpr(ColumnOrTableColumnConcept<T>) {
-                            return std::tuple();
-                        }else {
-                            return col.params;
-                        }
-                    }(columns))...);
-                }, _resultColumns);
-            }
-
-            auto GetWhereParamTuple() const {
-                if constexpr (std::is_null_pointer_v<_Where>) {
-                    return std::tuple();
-                } else {
-                    return _where.params;
-                }
-            }
-
-            auto GetGroupByParamTuple() const {
-                if constexpr (std::is_null_pointer_v<_GroupBy>) {
-                    return std::tuple();
-                } else {
-                    return std::apply([](auto &&... expr) { return GetExprsParamTuple(expr...); },
-                                      _groupBy);
-                }
-            }
-
-            auto GetOrderParamTuple() const {
-                if constexpr (std::is_null_pointer_v<_OrderExpr> || ColumnOrTableColumnConcept<_OrderExpr>) {
-                    return std::tuple();
-                } else {
-                    return _orderExpr.params;
-                }
-            }
+            Info _info;
 
         public:
-            explicit SelectStatement(
-                const SQLiteWrapper &sqlite,
-                const Source &source,
-                _Where where,
-                _GroupBy groupBy,
-                _OrderExpr orderExpr,
-                const OrderType &orderType,
-                const std::optional<std::pair<int, int> > &limitOffset,
-                bool isDistinct, ResultColumns... columns) : _sqlite(sqlite),
-                                                             _source(source),
-                                                             _where(where),
-                                                             _groupBy(groupBy),
-                                                             _orderExpr(orderExpr),
-                                                             _orderType(orderType),
-                                                             _resultColumns(columns...),
-                                                             _limitOffset(limitOffset),
-                                                             _isDistinct(isDistinct) {
+            explicit SelectStatement(const SQLiteWrapper &sqlite, Info info)
+                : Expressions<
+                      GetSelectResultDataType<decltype(std::declval<Info>().resultColumns)>(),
+                      decltype(GetSelectInfoCols(std::declval<Info>())),
+                      decltype(GetSelectInfoParams(std::declval<Info>()))
+                  >{
+                      .cols = GetSelectInfoCols(info),
+                      .sql = "("+GetInfoSql(info)+")",
+                      .params = GetSelectInfoParams(info)
+                  },
+                  _sqlite(sqlite),
+                  _info(info) {
             }
 
             template<ExprOrColConcept Expr>
             auto Where(const Expr &expr) {
-                return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-                    return SelectStatement<Expr, _GroupBy, _OrderExpr, ResultColumns...>(
-                        _sqlite, _source, expr, _groupBy, _orderExpr, _orderType, _limitOffset, _isDistinct,
-                        std::get<Is>(_resultColumns)...);
-                }(std::index_sequence_for<ResultColumns...>{});
+                auto info = std::apply([this,&expr](auto... results) {
+                    return MakeSelectStatementInfo(
+                        _info.source,
+                        expr,
+                        _info.groupBy,
+                        _info.orderExpr,
+                        _info.orderType,
+                        _info.limitOffset,
+                        _info.isDistinct,
+                        results...
+                    );
+                }, _info.resultColumns);
+                return SelectStatement<decltype(info)>(_sqlite, info);
             }
 
             SelectStatement &LimitOffset(int limit, int offset = 0) {
-                _limitOffset = std::make_pair(limit, offset);
+                _info.limitOffset = std::make_pair(limit, offset);
                 return *this;
             }
 
             SelectStatement &Distinct() {
-                _isDistinct = true;
+                _info.isDistinct = true;
                 return *this;
             }
 
             template<ExprOrColConcept... Exprs>
             auto GroupBy(Exprs... exprs) {
-                return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-                    return SelectStatement<_Where, std::tuple<Exprs...>, _OrderExpr, ResultColumns...>(
-                        _sqlite, _source, _where, std::make_tuple(exprs...), _orderExpr, _orderType, _limitOffset,
-                        _isDistinct,
-                        std::get<Is>(_resultColumns)...);
-                }(std::index_sequence_for<ResultColumns...>{});
+                auto info = std::apply([this,&exprs...](auto... results) {
+                    return MakeSelectStatementInfo(
+                        _info.source,
+                        _info.where,
+                        std::make_tuple(exprs...),
+                        _info.orderExpr,
+                        _info.orderType,
+                        _info.limitOffset,
+                        _info.isDistinct,
+                        results...
+                    );
+                }, _info.resultColumns);
+                return SelectStatement<decltype(info)>(_sqlite, info);
             }
 
             template<ExprOrColConcept Expr>
             auto OrderBy(Expr expr, OrderType order = OrderType::ASC) {
-                return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-                    return SelectStatement<_Where, _GroupBy, Expr, ResultColumns...>(
-                        _sqlite, _source, _where, _groupBy, expr, order, _limitOffset, _isDistinct,
-                        std::get<Is>(_resultColumns)...);
-                }(std::index_sequence_for<ResultColumns...>{});
+                auto info = std::apply([this,&expr,&order](auto... results) {
+                    return MakeSelectStatementInfo(
+                        _info.source,
+                        _info.where,
+                        _info.groupBy,
+                        expr,
+                        order,
+                        _info.limitOffset,
+                        _info.isDistinct,
+                        results...
+                    );
+                }, _info.resultColumns);
+                return SelectStatement<decltype(info)>(_sqlite, info);
             }
 
             auto Results() {
-                auto sql = std::string("SELECT ") + (_isDistinct ? "DISTINCT " : "") + std::apply(
-                               GetColumnNames<ResultColumns
-                                   ...>, _resultColumns) + " FROM " + MakeSourceSQL(_source);
-                if constexpr (!std::is_null_pointer_v<_Where>) {
-                    sql += " WHERE " + _where.sql;
-                }
-                if constexpr (!std::is_null_pointer_v<_GroupBy>) {
-                    sql += " GROUP BY " + std::apply([](auto &&... expr) { return MakeExprList(expr...); }, _groupBy);
-                }
-                if constexpr (!std::is_null_pointer_v<_OrderExpr>) {
-                    sql += " ORDER BY " + _orderExpr.sql + " " + OrderTypeToString(_orderType);
-                }
-                if (_limitOffset.has_value()) {
-                    sql += " LIMIT " + std::to_string(_limitOffset->first);
-                    if (_limitOffset->second > 0) {
-                        sql += " OFFSET " + std::to_string(_limitOffset->second);
-                    }
-                }
-                sql += ";";
-                auto all_params = std::tuple_cat(
-                    GetResultColumnParamTuple(),
-                    GetExtractSourceParams(_source),
-                    GetWhereParamTuple(),
-                    GetGroupByParamTuple(),
-                    GetOrderParamTuple()
-                );
-                return std::apply([this, &sql](auto &&... params) {
-                    return _sqlite.Query<ExprResultValueType<ResultColumns>...>(sql, params...);
-                }, all_params);
+                return std::apply([this](auto... params) {
+                    return std::apply([this,&params...](auto... results) {
+                        return _sqlite.Query<ExprResultValueType<decltype(results)>
+                            ...>(GetInfoSql(_info)+";", params...);
+                    }, _info.resultColumns);
+                }, this->params);
             }
+
             //TODO 支援Size查詢
         };
 
@@ -187,10 +246,17 @@ namespace TypeSQLite {
         auto Select(ResultCol... resultCols) const {
             //TODO 支援聚合暫時關閉檢查
             //static_assert(IsTypeGroupSubset<TypeGroup<ResultCol...>, columns>(),"ResultCol must be subset of table columns");
-            return SelectStatement<nullptr_t, nullptr_t, nullptr_t, ResultCol...>(
-                _sqlite, _source, nullptr, nullptr, nullptr, OrderType::ASC, std::nullopt,
+            auto info = MakeSelectStatementInfo(
+                _source,
+                nullptr,
+                nullptr,
+                nullptr,
+                OrderType::ASC,
+                std::nullopt,
                 false,
-                resultCols...);
+                resultCols...
+            );
+            return SelectStatement(_sqlite, info);
         }
 
         template<ConvertToQueryAbleConcept Table2, ExprOrColConcept Expr>

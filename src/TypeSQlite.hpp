@@ -13,7 +13,6 @@
 #include "SQLiteStruct/Expressions/MathFunctions.hpp"
 #include "SQLiteStruct/Expressions/ScalarFunctions.hpp"
 #include "SQLiteStruct/Expressions/DateTimeFunctions.hpp"
-#include "SQLiteStruct/Expressions/JsonFunctions.hpp"
 #include "SQliteStruct/Database.hpp"
 #include "SQLiteStruct/Order.hpp"
 #include "SQLiteWrapper.hpp"

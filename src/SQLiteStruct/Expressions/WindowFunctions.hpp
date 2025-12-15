@@ -40,7 +40,7 @@ namespace TypeSQLite {
             return "";
         } else {
             return std::apply([](auto... exprs) {
-                return " PARTITION BY " + MakeExprList(exprs...);
+                return " PARTITION BY " + GetExprSqls(exprs...);
             }, _info.partitionBy);
         }
     }

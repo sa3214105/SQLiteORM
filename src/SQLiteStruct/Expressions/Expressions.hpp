@@ -17,16 +17,18 @@ namespace TypeSQLite {
         const Parameters params;
     };
 
-    template<typename>
-    struct IsExpressions : std::false_type {
-    };
-
-    template<DataType exprResultType, typename Columns, typename Parameters>
-    struct IsExpressions<Expressions<exprResultType, Columns, Parameters> > : std::true_type {
-    };
+    template<typename T>
+    concept ExpressionsConcept = requires(T t)
+    {
+        { T::resultType } -> std::convertible_to<DataType>;
+        { t.cols };
+        { t.sql } -> std::convertible_to<std::string>;
+        { t.params };
+    } && (std::derived_from<T, Expressions<T::resultType, std::decay_t<decltype(std::declval<T>().cols)>, std::decay_t<
+        decltype(std::declval<T>().params)> > >);
 
     template<typename T>
-    concept ExpressionsConcept = IsExpressions<T>::value;
+    concept NullAbleExpr = ExpressionsConcept<T> && std::is_same_v<T, std::nullptr_t>;
 
     template<typename T>
     concept ExprOrColConcept = ExpressionsConcept<T> || ColumnOrTableColumnConcept<T>;
@@ -63,6 +65,7 @@ namespace TypeSQLite {
         };
     }
 
+    //TODO 目前multyType會誤判 等之後型別調整再處理
     template<typename expr>
     using ExprResultValueType = std::conditional_t<expr::resultType == DataType::TEXT, std::string,
         std::conditional_t<expr::resultType == DataType::NUMERIC, double,
@@ -253,16 +256,16 @@ namespace TypeSQLite {
         return MakeExpr<targetType>("CAST(" + expr.sql + " AS " + typeStr + ")", expr);
     }
 
-    template<ExprOrColConcept expr, ExprOrColConcept... exprs>
-    auto MakeExprList(const expr &first, const exprs &... rest) {
+    template<typename /*ExprOrColConcept*/ expr, typename/*ExprOrColConcept*/... exprs>
+    auto GetExprSqls(const expr &first, const exprs &... rest) {
         if constexpr (sizeof...(rest) == 0) {
             return first.sql;
         } else {
-            return MakeExpr<DataType::NUMERIC>(first.sql + ", " + MakeExprList(rest...).sql, first, MakeExprList(rest...));
+            return first.sql + ", " + GetExprSqls(rest...);
         }
     }
 
-    template<NullAbleExprOrColConcept expr, ExprOrColConcept... exprs>
+    template<typename/*NullAbleExprOrColConcept*/ expr, typename/*ExprOrColConcept*/... exprs>
     auto GetExprsColTuple(const expr &first, const exprs &... rest) {
         if constexpr (sizeof...(rest) == 0) {
             if constexpr (std::is_same_v<expr, std::nullptr_t>) {
@@ -273,7 +276,11 @@ namespace TypeSQLite {
                 return first.cols;
             }
         } else {
-            return std::tuple_cat(first.cols, GetExprColTuple(rest...));
+            if constexpr (ColumnOrTableColumnConcept<expr>) {
+                return std::tuple_cat(std::make_tuple(first), GetExprsColTuple(rest...));
+            } else {
+                return std::tuple_cat(first.cols, GetExprsColTuple(rest...));
+            }
         }
     }
 
@@ -291,7 +298,7 @@ namespace TypeSQLite {
         }
     }
 
-    template<NullAbleExprOrColConcept expr, ExprOrColConcept... exprs>
+    template<typename/*NullAbleExprOrColConcept*/ expr, typename/*ExprOrColConcept*/... exprs>
     auto GetExprsParamTuple(const expr &first, const exprs &... rest) {
         if constexpr (sizeof...(rest) == 0) {
             if constexpr (std::is_same_v<expr, std::nullptr_t>) {
@@ -302,7 +309,11 @@ namespace TypeSQLite {
                 return first.params;
             }
         } else {
-            return std::tuple_cat(first.params, GetExprsParamTuple(rest...));
+            if constexpr (ColumnOrTableColumnConcept<expr>) {
+                return GetExprsParamTuple(rest...);
+            } else {
+                return std::tuple_cat(first.params, GetExprsParamTuple(rest...));
+            }
         }
     }
 
